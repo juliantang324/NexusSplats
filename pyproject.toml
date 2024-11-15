@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "NexusSplats"
+version = "0.0.1"
+description = "Official code release for the NexusSplats paper"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text="MIT License"}
+dependencies = []
+
+[project.scripts]
+ns = "method.cli:main"
+
+[project.optional-dependencies]
+local = [
+    "torch>=2.0.0,<2.1.0",
+    "numpy<2.0.0",
+    "omegaconf",
+    "plyfile",
+    "tqdm",
+    "click",
+    "matplotlib",
+    "mediapy",
+    "requests",
+    "tensorboard",
+    "einops",
+    "torch-scatter",
+    "nerfbaselines>=1.2.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["method*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.yml", "*.yaml", "*.json"]
+
+[tool.ruff]
+ignore = ["E741", "E501"]
+
+[tool.pyright]
+ignore = ["E741", "E501"]
+exclude = [
+    "method/dinov2.py",
+    "submodules/**/*.py"
+]
