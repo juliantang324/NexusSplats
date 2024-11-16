@@ -1,15 +1,15 @@
 <p align="center">
 <h1 align="center">NexusSplats: Efficient 3D Gaussian Splatting in the Wild</h1>
   <p align="center">
-    <a>Yuzhou Tang</a>
+    Yuzhou Tang
     ·
-    <a>Dejun Xu</a>
+    Dejun Xu
     ·
-    <a>Yongjie Hou</a>
+    Yongjie Hou
     ·
-    <a>Zhenzhong Wang</a>
+    Zhenzhong Wang
     ·
-    <a>Min Jiang</a>
+    Min Jiang
   </p>
   <p align="center">School of Informatics, Xiamen University</p>
 
@@ -20,6 +20,9 @@
 [//]: # (  <img width="51%" alt="WildGaussians model appearance" src=".assets/cover-trevi.webp" />)
 [//]: # (  <img width="43%" alt="WildGaussians remove occluders" src=".assets/cover-onthego.webp" />)
 </p>
+
+<img width="100%" alt="teaser" src="assets/teaser.png" />
+
 <p align="justify">
 we propose a nexus kernel-driven approach, called NexusSplats, for efficient and finer 3D scene reconstruction under complex lighting and occlusion conditions.
 Experimental results demonstrate that NexusSplats achieves state-of-the-art rendering quality and reduces reconstruction time in different scenes by up to 70.4% compared to the current best method in quality.
@@ -38,19 +41,14 @@ cd NexusSplats
 
 conda create -y -n ns python=3.11
 conda activate ns
-pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
 conda env config vars set NERFBASELINES_BACKEND=python
+pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
 pip install --upgrade pip
 pip install -r requirements.txt
 pip install nerfbaselines>=1.2.0
 pip install -e ./submodules/diff-gaussian-rasterization ./submodules/simple-knn
 pip install -e .
 ```
-
-## Checkpoints, predictions, and data
-<ul>
-
-</ul>
 
 ## Interactive viewer
 To start the viewer and explore the trained models, run one of the following:
