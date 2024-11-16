@@ -83,11 +83,9 @@ There are several concurrent works that also aim to extend 3DGS to handle in-the
 <li><a href="https://arxiv.org/pdf/2403.15704">Gaussian in the Wild: 3D Gaussian Splatting for Unconstrained Image Collections</a></li>
 </ul>
 
-[//]: # (## Acknowledgements)
-
-[//]: # (The renderer is built on [3DGS]&#40;https://github.com/graphdeco-inria/gaussian-splatting&#41; and [Mip-Splatting]&#40;https://niujinshuchong.github.io/mip-splatting/&#41;.)
-
-[//]: # (Please follow the license of 3DGS and Mip-Splatting. We thank all the authors for their great work and released code.)
+## Acknowledgements
+We sincerely appreciate the authors of [3DGS](https://github.com/graphdeco-inria/gaussian-splatting) and [NerfBaselines](https://github.com/nerfbaselines/nerfbaselines) for their great work and released code.
+Please follow their licenses when using our code.
 
 [//]: # (## Citation)
 
