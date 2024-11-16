@@ -208,13 +208,9 @@ def eval_few_custom(method: Method, logger: Logger, dataset: Dataset, split: str
 
 
 _CONFIG_OVERRIDES = {
-    "nerfonthego": {
-        "config": "nerfonthego.yml",
-    },
     "phototourism": {
         "config": "phototourism.yml",
-    },
-    "default": {},
+    }
 }
 
 
@@ -230,7 +226,7 @@ def log_memory_usage():
 @click.option("--output", type=str, default="output", help="Output directory")
 @click.option("--verbose", "-v", is_flag=True)
 @click.option("--debug", is_flag=True)
-@click.option("--dataset-type", type=click.Choice(["default", "nerfonthego", "phototourism"]), default="default")
+@click.option("--dataset-type", type=click.Choice(["phototourism"]), default="phototourism")
 @click.option("--eval-few-iters", type=IndicesClickType(), default=Indices.every_iters(2_000),
               help="When to evaluate on few images")
 @click.option("--set", "config_overrides", help="Override a parameter in the method.", type=SetParamOptionType(),
@@ -240,7 +236,7 @@ def train_command(
         output,
         verbose,
         eval_few_iters,
-        dataset_type="default",
+        dataset_type="phototourism",
         config_overrides=None,
         debug=False,
 ):
@@ -261,44 +257,21 @@ def train_command(
     # Load dataset
     method_info = NexusSplats.get_method_info()
     features: FrozenSet[DatasetFeature] = frozenset({"color", "points3D_xyz"})
-    if dataset_type == "phototourism":
-        assert config_overrides["config"] == "phototourism.yml"
-        from .datasets.phototourism import load_phototourism_dataset, download_phototourism_dataset, \
-            NerfWEvaluationProtocol
 
-        evaluation_protocol = NerfWEvaluationProtocol()
-        load_dataset_fn = partial(
-            load_dataset,
-            load_dataset_fn=load_phototourism_dataset,
-            download_dataset_fn=download_phototourism_dataset,
-            evaluation_protocol=evaluation_protocol.get_name(),
-        )
-    else:
-        if dataset_type == "nerfonthego":
-            assert config_overrides["config"] == "nerfonthego.yml"
-        from .datasets.colmap import load_colmap_dataset
-        evaluation_protocol = DefaultEvaluationProtocol()
-        load_dataset_fn = partial(
-            load_dataset,
-            load_dataset_fn=load_colmap_dataset,
-            images_path="images",
-            evaluation_protocol=evaluation_protocol.get_name()
-        )
+    assert config_overrides["config"] == "phototourism.yml"
+    from datasets.phototourism import load_phototourism_dataset, download_phototourism_dataset, NerfWEvaluationProtocol
+
+    evaluation_protocol = NerfWEvaluationProtocol()
+    load_dataset_fn = partial(
+        load_dataset,
+        load_dataset_fn=load_phototourism_dataset,
+        download_dataset_fn=download_phototourism_dataset,
+        evaluation_protocol=evaluation_protocol.get_name(),
+    )
 
     test_dataset = load_dataset_fn(data, "test", features, load_features=False)
     train_dataset = load_dataset_fn(data, "train", features, load_features=False)
-    if dataset_type == "nerfonthego":
-        dataset_not_official = "Please use the dataset provided for the WG paper"
-        assert os.path.exists(os.path.join(data, "nb-info.json")), dataset_not_official
-        with open(os.path.join(data, "nb-info.json"), "r") as f:
-            info = json.load(f)
-            assert info.pop("loader", None) == "colmap", dataset_not_official
-            info.pop("loader_kwargs", None)
-            info_name = info.get("id", info.get("name"))
-            assert info_name == "nerfonthego-undistorted", dataset_not_official
-            info["id"] = info_name
-            test_dataset["metadata"].update(info)
-            train_dataset["metadata"].update(info)
+
     if debug:
         train_dataset = datasets.dataset_index_select(train_dataset, slice(None, 8))
         test_dataset = datasets.dataset_index_select(test_dataset, slice(None, 8))
@@ -346,7 +319,6 @@ def train_command(
             acc_metrics_values = acc_metrics.pop()
             pbar.set_postfix({"train/loss": f"{acc_metrics_values['loss']:.4f}", "psnr": f"{acc_metrics_values['psnr']:.4f}"})
             with logger.add_event(step) as event:
-                event.add_scalar(f"cuda-memory usage (MB)", log_memory_usage() / (1024 ** 2))
                 for k, val in acc_metrics_values.items():
                     event.add_scalar(f"train/{k}", val)
 
