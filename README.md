@@ -20,9 +20,6 @@
 [//]: # (  <img width="51%" alt="WildGaussians model appearance" src=".assets/cover-trevi.webp" />)
 [//]: # (  <img width="43%" alt="WildGaussians remove occluders" src=".assets/cover-onthego.webp" />)
 </p>
-
-<img width="100%" alt="teaser" src="assets/teaser.png" />
-
 <p align="justify">
 we propose a nexus kernel-driven approach, called NexusSplats, for efficient and finer 3D scene reconstruction under complex lighting and occlusion conditions.
 Experimental results demonstrate that NexusSplats achieves state-of-the-art rendering quality and reduces reconstruction time in different scenes by up to 70.4% compared to the current best method in quality.
@@ -68,6 +65,113 @@ ns train --data external://phototourism/sacre-coeur
 ns train --data external://phototourism/brandenburg-gate
 ```
 
+## Quantitative Comparison
+
+<table>
+  <tr>
+    <th>Scene</th>
+    <th colspan="3">Brandenburg Gate</th>
+    <th colspan="3">Sacre Coeur</th>
+    <th colspan="3">Trevi Fountain</th>
+  </tr>
+  <tr>
+    <th>Method</th>
+    <th>PSNR ↑</th>
+    <th>SSIM ↑</th>
+    <th>LPIPS ↓</th>
+    <th>PSNR ↑</th>
+    <th>SSIM ↑</th>
+    <th>LPIPS ↓</th>
+    <th>PSNR ↑</th>
+    <th>SSIM ↑</th>
+    <th>LPIPS ↓</th>
+  </tr>
+  <tr>
+    <td>NeRF</td>
+    <td>18.90</td>
+    <td>0.815</td>
+    <td>0.231</td>
+    <td>15.60</td>
+    <td>0.715</td>
+    <td>0.291</td>
+    <td>16.14</td>
+    <td>0.600</td>
+    <td>0.366</td>
+  </tr>
+  <tr>
+    <td>NeRF-W-re</td>
+    <td>24.17</td>
+    <td>0.890</td>
+    <td>0.167</td>
+    <td>19.20</td>
+    <td>0.807</td>
+    <td>0.191</td>
+    <td>18.97</td>
+    <td>0.698</td>
+    <td>0.265</td>
+  </tr>
+  <tr>
+    <td>K-Planes</td>
+    <td>25.49</td>
+    <td>0.879</td>
+    <td>0.224</td>
+    <td>20.61</td>
+    <td>0.774</td>
+    <td>0.265</td>
+    <td>22.67</td>
+    <td>0.714</td>
+    <td>0.317</td>
+  </tr>
+  <tr>
+    <td>3DGS</td>
+    <td>20.02</td>
+    <td>0.882</td>
+    <td>0.176</td>
+    <td>17.68</td>
+    <td>0.835</td>
+    <td>0.204</td>
+    <td>18.07</td>
+    <td>0.709</td>
+    <td>0.272</td>
+  </tr>
+  <tr>
+    <td>GS-W</td>
+    <td>24.32</td>
+    <td>0.909</td>
+    <td>0.148</td>
+    <td>19.57</td>
+    <td>0.826</td>
+    <td>0.207</td>
+    <td>20.48</td>
+    <td>0.734</td>
+    <td>0.252</td>
+  </tr>
+  <tr>
+    <td>WildGauss</td>
+    <td>27.23</td>
+    <td>0.926</td>
+    <td>0.135</td>
+    <td>22.56</td>
+    <td>0.859</td>
+    <td>0.177</td>
+    <td>23.52</td>
+    <td>0.765</td>
+    <td>0.228</td>
+  </tr>
+  <tr>
+    <th>NexusSplats</th>
+    <th>27.76</th>
+    <td>0.922</td>
+    <td>0.141</td>
+    <th>23.13</th>
+    <th>0.859</th>
+    <th>0.174</th>
+    <th>23.96</th>
+    <th>0.766</th>
+    <td>0.240</td>
+  </tr>
+</table>
+
 The training will also generate output artifacts containing the **test set predictions**, **checkpoint**, and **tensorboard logs**.
 
 ## Rendering videos
@@ -84,12 +188,16 @@ There are several concurrent works that also aim to extend 3DGS to handle in-the
 </ul>
 
 ## Acknowledgements
-We sincerely appreciate the authors of [3DGS](https://github.com/graphdeco-inria/gaussian-splatting) and [NerfBaselines](https://github.com/nerfbaselines/nerfbaselines) for their great work and released code.
-Please follow their licenses when using our code.
+We sincerely appreciate the authors of [3DGS] and NerfBaselines for their great work and released code. Please follow their licenses when using our code.
+
+[//]: # (The renderer is built on [3DGS]&#40;https://github.com/graphdeco-inria/gaussian-splatting&#41; and [Mip-Splatting]&#40;https://niujinshuchong.github.io/mip-splatting/&#41;.)
+
+[//]: # (Please follow the license of 3DGS and Mip-Splatting. We thank all the authors for their great work and released code.)
 
 [//]: # (## Citation)
 
 [//]: # (If you find our code or paper useful, please cite:)
-```bibtex
+[//]: # (```bibtex)
 
-```
+[//]: # ()
+[//]: # (```)
