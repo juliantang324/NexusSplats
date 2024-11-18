@@ -259,7 +259,7 @@ def train_command(
     features: FrozenSet[DatasetFeature] = frozenset({"color", "points3D_xyz"})
 
     assert config_overrides["config"] == "phototourism.yml"
-    from datasets.phototourism import load_phototourism_dataset, download_phototourism_dataset, NerfWEvaluationProtocol
+    from .datasets.phototourism import load_phototourism_dataset, download_phototourism_dataset, NerfWEvaluationProtocol
 
     evaluation_protocol = NerfWEvaluationProtocol()
     load_dataset_fn = partial(

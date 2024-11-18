@@ -21,40 +21,6 @@ class Config:
     lambda_dssim: float = 0.2
     densify_grad_threshold: float = 0.0002
 
-    appearance_n_fourier_freqs: int = 4
-    embedding_lr: float = 0.005
-    embedding_regularization: float = 0.0
-
-    appearance_enabled: bool = True
-    appearance_embedding_dim: int = 32
-    appearance_embedding_lr: float = 0.001
-    appearance_mlp_lr: float = 0.0005
-    appearance_embedding_regularization: float = 0.0
-    appearance_embedding_optim_lr: float = 0.1
-    appearance_embedding_optim_iters: int = 128
-    appearance_optim_type: str = "dssim+l1"
-    """Either 'mse', 'dssim+l1'"""
-    appearance_separate_tuned_color: bool = True
-    appearance_dropout: float = 0.2
-    appearance_init_fourier: bool = True
-
-    # Uncertainty model
-    uncertainty_enabled: bool = True
-    uncertainty_embedding_dim: int = 32
-    uncertainty_embedding_lr: float = 0.001
-    transient_embedding_dim: int = 32
-    transient_embedding_lr: float = 0.001
-    transient_regularization: float = 0.0
-    uncertainty_mode: UncertaintyMode = "dino"
-    uncertainty_backbone: str = "dinov2_vits14_reg"
-    uncertainty_regularizer_weight: float = 0.5
-    uncertainty_lr: float = 0.0005
-    uncertainty_scale_grad: bool = False
-    uncertainty_center_mult: bool = False
-    uncertainty_warmup_iters: int = 0
-    uncertainty_warmup_start: int = 2000
-    use_boundary_penalty: bool = True
-
     # Nexus Kernels
     feat_dim: int = 32
     n_offsets: int = 10
@@ -111,3 +77,36 @@ class Config:
 
     min_opacity: float = 0.005
     success_threshold: float = 0.8
+
+    # Light Decoupling
+    appearance_enabled: bool = True
+    light_embedding_dim: int = 32
+    light_embedding_lr: float = 0.001
+    light_embedding_regularization: float = 0.0
+    light_embedding_optim_lr: float = 0.1
+    light_embedding_optim_iters: int = 128
+    appearance_n_fourier_freqs: int = 4
+    appearance_embedding_lr: float = 0.005
+    appearance_mlp_lr: float = 0.0005
+    appearance_optim_type: str = "dssim+l1"
+    """Either 'mse', 'dssim+l1'"""
+    appearance_separate_tuned_color: bool = True
+    appearance_dropout: float = 0.2
+    appearance_init_fourier: bool = True
+
+    # Uncertainty model
+    uncertainty_enabled: bool = True
+    uncertainty_embedding_dim: int = 32
+    uncertainty_embedding_lr: float = 0.001
+    transient_embedding_dim: int = 32
+    transient_embedding_lr: float = 0.001
+    transient_regularization: float = 0.0
+    uncertainty_mode: UncertaintyMode = "dino"
+    uncertainty_backbone: str = "dinov2_vits14_reg"
+    uncertainty_regularizer_weight: float = 0.5
+    uncertainty_lr: float = 0.0005
+    uncertainty_scale_grad: bool = False
+    uncertainty_center_mult: bool = False
+    uncertainty_warmup_iters: int = 0
+    uncertainty_warmup_start: int = 2000
+    use_boundary_penalty: bool = True

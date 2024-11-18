@@ -425,7 +425,7 @@ def _get_fourier_features(xyz, num_features=3):
     return feat
 
 
-class AppearanceModel(nn.Module):
+class LightDecoupling(nn.Module):
     def __init__(self, config: Config):
         super().__init__()
         self.config = config
@@ -433,7 +433,7 @@ class AppearanceModel(nn.Module):
         feat_in = 3 * config.n_offsets
         self.mlp = nn.Sequential(
             nn.Linear(
-                config.appearance_embedding_dim + feat_in + 3 + self.dist_dim + 6 * self.config.appearance_n_fourier_freqs,
+                config.light_embedding_dim + feat_in + 3 + self.dist_dim + 6 * self.config.appearance_n_fourier_freqs,
                 256),
             nn.ReLU(),
             nn.Dropout(config.appearance_dropout),
@@ -613,19 +613,19 @@ def strip_symmetric(sym):
 
 
 class GaussianModel(nn.Module):
-    anchor: nn.Parameter
+    kernel: nn.Parameter
     offset: nn.Parameter
-    anchor_feat: nn.Parameter
+    kernel_feat: nn.Parameter
     opacity_accum: Tensor
     scaling: nn.Parameter
     rotation: nn.Parameter
     opacity: nn.Parameter
     offset_gradient_accum: Tensor
     offset_denom: Tensor
-    anchor_denom: Tensor
+    kernel_denom: Tensor
     appearance_embeddings: Optional[nn.Parameter]
-    embeddings: Optional[nn.Parameter]
-    appearance_mlp: Optional[AppearanceModel]
+    light_embeddings: Optional[nn.Parameter]
+    appearance_mlp: Optional[LightDecoupling]
 
     # Setup functions
     @staticmethod
@@ -652,9 +652,9 @@ class GaussianModel(nn.Module):
         self._optimizer_state = None
         self.config = config
 
-        self.register_parameter("anchor", cast(nn.Parameter, nn.Parameter(torch.empty(0, 3, dtype=torch.float32, requires_grad=True))))
+        self.register_parameter("kernel", cast(nn.Parameter, nn.Parameter(torch.empty(0, 3, dtype=torch.float32, requires_grad=True))))
         self.register_parameter("offset", cast(nn.Parameter, nn.Parameter(torch.empty(0, self.n_offsets, 3, dtype=torch.float32, requires_grad=True))))
-        self.register_parameter("anchor_feat", cast(nn.Parameter, nn.Parameter(torch.empty(0, config.feat_dim, dtype=torch.float32, requires_grad=True))))
+        self.register_parameter("kernel_feat", cast(nn.Parameter, nn.Parameter(torch.empty(0, config.feat_dim, dtype=torch.float32, requires_grad=True))))
         self.register_parameter("scaling", cast(nn.Parameter, nn.Parameter(torch.empty(0, 6, dtype=torch.float32, requires_grad=True))))
         self.register_parameter("rotation", cast(nn.Parameter, nn.Parameter(torch.empty(0, 4, dtype=torch.float32, requires_grad=False))))
         self.register_parameter("opacity", cast(nn.Parameter, nn.Parameter(torch.empty(0, 1, dtype=torch.float32, requires_grad=False))))
@@ -662,10 +662,11 @@ class GaussianModel(nn.Module):
         self.register_buffer("opacity_accum", torch.empty(0))
         self.register_buffer("offset_gradient_accum", torch.empty(0))
         self.register_buffer("offset_denom", torch.empty(0))
-        self.register_buffer("anchor_denom", torch.empty(0))
+        self.register_buffer("kernel_denom", torch.empty(0))
 
         self._dynamically_sized_props = [
-            "anchor", "offset", "anchor_feat", "scaling", "rotation", "opacity", "embeddings", "uncertainty_embeddings",
+            "kernel", "offset", "kernel_feat", "scaling", "rotation", "opacity",
+            "appearance_embeddings", "uncertainty_embeddings",
         ]
 
         if self.config.use_feat_bank:
@@ -700,18 +701,18 @@ class GaussianModel(nn.Module):
         ).cuda()
 
         if self.config.appearance_enabled:
-            self.register_parameter("appearance_embeddings", cast(nn.Parameter, nn.Parameter(
-                torch.empty(0, config.appearance_embedding_dim, dtype=torch.float32, requires_grad=True))))
+            self.register_parameter("light_embeddings", cast(nn.Parameter, nn.Parameter(
+                torch.empty(0, config.light_embedding_dim, dtype=torch.float32, requires_grad=True))))
         else:
-            self.appearance_embeddings = None
+            self.light_embeddings = None
 
         if self.config.appearance_enabled:
-            self.register_parameter("embeddings", cast(nn.Parameter, nn.Parameter(torch.empty(
+            self.register_parameter("appearance_embeddings", cast(nn.Parameter, nn.Parameter(torch.empty(
                 0, 6 * self.config.appearance_n_fourier_freqs, dtype=torch.float32, requires_grad=True))))
-            self.appearance_mlp = AppearanceModel(config)
+            self.appearance_mlp = LightDecoupling(config)
         else:
             self.appearance_mlp = None
-            self.embeddings = None
+            self.appearance_embeddings = None
 
         if self.config.uncertainty_enabled:
             self.register_parameter("transient_embeddings", cast(nn.Parameter, nn.Parameter(
@@ -735,10 +736,9 @@ class GaussianModel(nn.Module):
     def voxelize_sample(self, data=None, voxel_size=0.01):
         np.random.shuffle(data)
         data = np.unique(np.round(data / voxel_size), axis=0) * voxel_size
-
         return data
 
-    def initialize_from_points3D(self, xyz, spatial_lr_scale: float):
+    def initialize_from_points(self, xyz, spatial_lr_scale: float):
         self.spatial_lr_scale = spatial_lr_scale
         points = xyz[::self.config.ratio]
 
@@ -756,7 +756,7 @@ class GaussianModel(nn.Module):
         points = self.voxelize_sample(points, voxel_size=self.voxel_size)
         fused_point_cloud = torch.tensor(np.asarray(points)).float().cuda()
         offsets = torch.zeros((fused_point_cloud.shape[0], self.n_offsets, 3)).float().cuda()
-        anchors_feat = torch.zeros((fused_point_cloud.shape[0], self.config.feat_dim)).float().cuda()
+        kernels_feat = torch.zeros((fused_point_cloud.shape[0], self.config.feat_dim)).float().cuda()
 
         logging.info(f"Number of points at initialisation: {fused_point_cloud.shape[0]}")
 
@@ -770,30 +770,30 @@ class GaussianModel(nn.Module):
         opacities = torch.special.logit(opacities)
 
         self._resize_parameters(fused_point_cloud.shape[0])
-        self.anchor.data.copy_(fused_point_cloud)
+        self.kernel.data.copy_(fused_point_cloud)
         self.offset.data.copy_(offsets)
-        self.anchor_feat.data.copy_(anchors_feat)
+        self.kernel_feat.data.copy_(kernels_feat)
         self.scaling.data.copy_(scales)
         self.rotation.data.copy_(rots)
         self.opacity.data.copy_(opacities)
         self.opacity_accum = torch.zeros((fused_point_cloud.shape[0], 1), device="cuda")
         self.offset_gradient_accum = torch.zeros((fused_point_cloud.shape[0] * self.n_offsets, 1), device="cuda")
         self.offset_denom = torch.zeros((fused_point_cloud.shape[0] * self.n_offsets, 1), device="cuda")
-        self.anchor_denom = torch.zeros((fused_point_cloud.shape[0], 1), device="cuda")
-        if self.embeddings is not None:
+        self.kernel_denom = torch.zeros((fused_point_cloud.shape[0], 1), device="cuda")
+        if self.appearance_embeddings is not None:
             embeddings = _get_fourier_features(points, num_features=self.config.appearance_n_fourier_freqs)
             embeddings.add_(torch.randn_like(embeddings) * 0.0001)
             if not self.config.appearance_init_fourier:
                 embeddings.normal_(0, 0.01)
-            self.embeddings.data.copy_(embeddings)
+            self.appearance_embeddings.data.copy_(embeddings)
 
     def _setup_optimizers(self):
         config = self.config
 
         l = [
-            {'params': [self.anchor], 'lr': config.position_lr_init * self.spatial_lr_scale, "name": "anchor"},
+            {'params': [self.kernel], 'lr': config.position_lr_init * self.spatial_lr_scale, "name": "kernel"},
             {'params': [self.offset], 'lr': config.offset_lr_init * self.spatial_lr_scale, "name": "offset"},
-            {'params': [self.anchor_feat], 'lr': config.feature_lr, "name": "anchor_feat"},
+            {'params': [self.kernel_feat], 'lr': config.feature_lr, "name": "kernel_feat"},
             {'params': [self.opacity], 'lr': config.opacity_lr, "name": "opacity"},
             {'params': [self.scaling], 'lr': config.scaling_lr, "name": "scaling"},
             {'params': [self.rotation], 'lr': config.rotation_lr, "name": "rotation"},
@@ -806,9 +806,9 @@ class GaussianModel(nn.Module):
             l.append({'params': self.mlp_feature_bank.parameters(), 'lr': config.mlp_featurebank_lr_init,
                       "name": "mlp_featurebank"})
 
-        if self.appearance_embeddings is not None:
-            l.append({'params': [self.appearance_embeddings], 'lr': config.appearance_embedding_lr,
-                      "name": "appearance_embeddings", "weight_decay": config.appearance_embedding_regularization})
+        if self.light_embeddings is not None:
+            l.append({'params': [self.light_embeddings], 'lr': config.light_embedding_lr,
+                      "name": "light_embeddings", "weight_decay": config.light_embedding_regularization})
 
         if self.transient_embeddings is not None:
             l.append({'params': [self.transient_embeddings], 'lr': config.transient_embedding_lr,
@@ -818,8 +818,9 @@ class GaussianModel(nn.Module):
             l.append({'params': [self.uncertainty_embeddings], 'lr': config.uncertainty_embedding_lr,
                       "name": "uncertainty_embeddings"})
 
-        if self.embeddings is not None:
-            l.append({'params': [self.embeddings], 'lr': config.embedding_lr, "name": "embeddings"})
+        if self.appearance_embeddings is not None:
+            l.append({'params': [self.appearance_embeddings], 'lr': config.appearance_embedding_lr,
+                      "name": "appearance_embeddings"})
 
         if self.appearance_mlp is not None:
             l.append({'params': list(self.appearance_mlp.parameters()), 'lr': config.appearance_mlp_lr,
@@ -831,7 +832,7 @@ class GaussianModel(nn.Module):
 
         self.optimizer = torch.optim.Adam(l, lr=1.0, eps=1e-15)
 
-        self.anchor_scheduler_args = get_expon_lr_func(lr_init=config.position_lr_init * self.spatial_lr_scale,
+        self.kernel_scheduler_args = get_expon_lr_func(lr_init=config.position_lr_init * self.spatial_lr_scale,
                                                        lr_final=config.position_lr_final * self.spatial_lr_scale,
                                                        lr_delay_mult=config.position_lr_delay_mult,
                                                        max_steps=config.position_lr_max_steps)
@@ -861,9 +862,9 @@ class GaussianModel(nn.Module):
                                                                     max_steps=config.mlp_featurebank_lr_max_steps)
 
     def set_num_training_images(self, num_images):
-        if self.appearance_embeddings is not None:
-            self._resize_parameter("appearance_embeddings", (num_images, self.appearance_embeddings.shape[1]))
-            self.appearance_embeddings.data.normal_(0, 0.01)
+        if self.light_embeddings is not None:
+            self._resize_parameter("light_embeddings", (num_images, self.light_embeddings.shape[1]))
+            self.light_embeddings.data.normal_(0, 0.01)
         if self.transient_embeddings is not None:
             self._resize_parameter("transient_embeddings", (num_images, self.transient_embeddings.shape[1]))
             self.transient_embeddings.data.normal_(0, 0.01)
@@ -915,9 +916,9 @@ class GaussianModel(nn.Module):
     def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys,
                               error_msgs):
         # Resize all buffers to match the new state_dict
-        self._resize_parameters(state_dict["anchor"].shape[0])
-        if self.appearance_embeddings is not None:
-            self._resize_parameter("appearance_embeddings", state_dict["appearance_embeddings"].shape)
+        self._resize_parameters(state_dict["kernel"].shape[0])
+        if self.light_embeddings is not None:
+            self._resize_parameter("light_embeddings", state_dict["light_embeddings"].shape)
         if self.transient_embeddings is not None:
             self._resize_parameter("transient_embeddings", state_dict["transient_embeddings"].shape)
         optimizer = state_dict.pop("optimizer")
@@ -938,12 +939,12 @@ class GaussianModel(nn.Module):
             state["optimizer"] = self.optimizer.state_dict()
         return state
 
-    def get_embedding(self, train_image_id=None):
-        if self.appearance_embeddings is None:
+    def get_light_embedding(self, train_image_id=None):
+        if self.light_embeddings is None:
             return None
         if train_image_id is not None:
-            return self.appearance_embeddings[train_image_id]
-        return torch.zeros_like(self.appearance_embeddings[0])
+            return self.light_embeddings[train_image_id]
+        return torch.zeros_like(self.light_embeddings[0])
 
     def get_transient_embedding(self, train_image_id=None):
         if self.transient_embeddings is None:
@@ -959,8 +960,8 @@ class GaussianModel(nn.Module):
             if param_group["name"] == "offset":
                 lr = self.offset_scheduler_args(iteration)
                 param_group['lr'] = lr
-            if param_group["name"] == "anchor":
-                lr = self.anchor_scheduler_args(iteration)
+            if param_group["name"] == "kernel":
+                lr = self.kernel_scheduler_args(iteration)
                 param_group['lr'] = lr
             if param_group["name"] == "mlp_opacity":
                 lr = self.mlp_opacity_scheduler_args(iteration)
@@ -980,8 +981,8 @@ class GaussianModel(nn.Module):
             l = ['x', 'y', 'z', 'nx', 'ny', 'nz']
             for i in range(self.offset.shape[1] * self.offset.shape[2]):
                 l.append('f_offset_{}'.format(i))
-            for i in range(self.anchor_feat.shape[1]):
-                l.append('f_anchor_feat_{}'.format(i))
+            for i in range(self.kernel_feat.shape[1]):
+                l.append('f_kernel_feat_{}'.format(i))
             l.append('opacity')
             for i in range(self.scaling.shape[1]):
                 l.append('scale_{}'.format(i))
@@ -991,9 +992,9 @@ class GaussianModel(nn.Module):
 
         os.makedirs(os.path.dirname(path), exist_ok=True)
 
-        anchor = self.anchor.detach().cpu().numpy()
-        normals = np.zeros_like(anchor)
-        anchor_feat = self.anchor_feat.detach().cpu().numpy()
+        kernel = self.kernel.detach().cpu().numpy()
+        normals = np.zeros_like(kernel)
+        kernel_feat = self.kernel_feat.detach().cpu().numpy()
         offset = self.offset.detach().transpose(1, 2).flatten(start_dim=1).contiguous().cpu().numpy()
         opacities = self.opacity.detach().cpu().numpy()
         scale = self.scaling.detach().cpu().numpy()
@@ -1001,8 +1002,8 @@ class GaussianModel(nn.Module):
 
         dtype_full = [(attribute, 'f4') for attribute in construct_list_of_attributes()]
 
-        elements = np.empty(anchor.shape[0], dtype=dtype_full)
-        attributes = np.concatenate((anchor, normals, offset, anchor_feat, opacities, scale, rotation), axis=1)
+        elements = np.empty(kernel.shape[0], dtype=dtype_full)
+        attributes = np.concatenate((kernel, normals, offset, kernel_feat, opacities, scale, rotation), axis=1)
         elements[:] = list(map(tuple, attributes))
         el = PlyElement.describe(elements, 'vertex')
         PlyData([el]).write(path)
@@ -1048,21 +1049,21 @@ class GaussianModel(nn.Module):
         return optimizable_tensors
 
     def training_statis(self, viewspace_point_tensor, opacity, update_filter, offset_selection_mask,
-                        anchor_visible_mask):
+                        kernel_visible_mask):
         # update opacity stats
         temp_opacity = opacity.clone().view(-1).detach()
         temp_opacity[temp_opacity < 0] = 0
 
         temp_opacity = temp_opacity.view([-1, self.n_offsets])
-        self.opacity_accum[anchor_visible_mask] += temp_opacity.sum(dim=1, keepdim=True)
+        self.opacity_accum[kernel_visible_mask] += temp_opacity.sum(dim=1, keepdim=True)
 
-        # update anchor visiting statis
-        self.anchor_denom[anchor_visible_mask] += 1
+        # update kernel visiting statis
+        self.kernel_denom[kernel_visible_mask] += 1
 
         # update neural gaussian statis
-        anchor_visible_mask = anchor_visible_mask.unsqueeze(dim=1).repeat([1, self.n_offsets]).view(-1)
+        kernel_visible_mask = kernel_visible_mask.unsqueeze(dim=1).repeat([1, self.n_offsets]).view(-1)
         combined_mask = torch.zeros_like(self.offset_gradient_accum, dtype=torch.bool).squeeze(dim=1)
-        combined_mask[anchor_visible_mask] = offset_selection_mask
+        combined_mask[kernel_visible_mask] = offset_selection_mask
         temp_mask = combined_mask.clone()
         combined_mask[temp_mask] = update_filter
 
@@ -1070,7 +1071,7 @@ class GaussianModel(nn.Module):
         self.offset_gradient_accum[combined_mask] += grad_norm
         self.offset_denom[combined_mask] += 1
 
-    def _prune_anchor_optimizer(self, mask):
+    def _prune_kernel_optimizer(self, mask):
         optimizable_tensors = {}
         for group in self.optimizer.param_groups:
             if group["name"] not in self._dynamically_sized_props:
@@ -1099,24 +1100,24 @@ class GaussianModel(nn.Module):
 
         return optimizable_tensors
 
-    def prune_anchor(self, mask):
+    def prune_kernel(self, mask):
         valid_points_mask = ~mask
 
-        optimizable_tensors = self._prune_anchor_optimizer(valid_points_mask)
+        optimizable_tensors = self._prune_kernel_optimizer(valid_points_mask)
 
-        self.anchor = optimizable_tensors["anchor"]
+        self.kernel = optimizable_tensors["kernel"]
         self.offset = optimizable_tensors["offset"]
-        self.anchor_feat = optimizable_tensors["anchor_feat"]
+        self.kernel_feat = optimizable_tensors["kernel_feat"]
         self.opacity = optimizable_tensors["opacity"]
         self.scaling = optimizable_tensors["scaling"]
         self.rotation = optimizable_tensors["rotation"]
         if self.config.appearance_enabled:
-            self.embeddings = optimizable_tensors["embeddings"]
+            self.appearance_embeddings = optimizable_tensors["appearance_embeddings"]
         if self.config.uncertainty_enabled:
             self.uncertainty_embeddings = optimizable_tensors["uncertainty_embeddings"]
 
-    def anchor_growing(self, grads, threshold, offset_mask):
-        init_length = self.anchor.shape[0] * self.n_offsets
+    def kernel_growing(self, grads, threshold, offset_mask):
+        init_length = self.kernel.shape[0] * self.n_offsets
         for i in range(self.config.update_depth):
             # update threshold
             cur_threshold = threshold * ((self.config.update_hierachy_factor // 2) ** i)
@@ -1129,19 +1130,19 @@ class GaussianModel(nn.Module):
             rand_mask = rand_mask.cuda()
             candidate_mask = torch.logical_and(candidate_mask, rand_mask)
 
-            length_inc = self.anchor.shape[0] * self.n_offsets - init_length
+            length_inc = self.kernel.shape[0] * self.n_offsets - init_length
             if length_inc == 0:
                 if i > 0:
                     continue
             else:
                 candidate_mask = torch.cat([candidate_mask, torch.zeros(length_inc, dtype=torch.bool, device='cuda')], dim=0)
 
-            all_xyz = self.anchor.unsqueeze(dim=1) + self.offset * self.get_scaling[:, :3].unsqueeze(dim=1)
+            all_xyz = self.kernel.unsqueeze(dim=1) + self.offset * self.get_scaling[:, :3].unsqueeze(dim=1)
 
             size_factor = self.config.update_init_factor // (self.config.update_hierachy_factor ** i)
             cur_size = self.voxel_size * size_factor
 
-            grid_coords = torch.round(self.anchor / cur_size).int()
+            grid_coords = torch.round(self.kernel / cur_size).int()
 
             selected_xyz = all_xyz.view([-1, 3])[candidate_mask]
             selected_grid_coords = torch.round(selected_xyz / cur_size).int()
@@ -1166,35 +1167,35 @@ class GaussianModel(nn.Module):
                 remove_duplicates = (selected_grid_coords_unique.unsqueeze(1) == grid_coords).all(-1).any(-1).view(-1)
 
             remove_duplicates = ~remove_duplicates
-            candidate_anchor = selected_grid_coords_unique[remove_duplicates] * cur_size
+            candidate_kernel = selected_grid_coords_unique[remove_duplicates] * cur_size
 
-            if candidate_anchor.shape[0] > 0:
-                new_scaling = torch.ones_like(candidate_anchor).repeat([1, 2]).float().cuda() * cur_size  # *0.05
+            if candidate_kernel.shape[0] > 0:
+                new_scaling = torch.ones_like(candidate_kernel).repeat([1, 2]).float().cuda() * cur_size  # *0.05
                 new_scaling = torch.log(new_scaling)
-                new_rotation = torch.zeros([candidate_anchor.shape[0], 4], device=candidate_anchor.device).float()
+                new_rotation = torch.zeros([candidate_kernel.shape[0], 4], device=candidate_kernel.device).float()
                 new_rotation[:, 0] = 1.0
 
                 new_opacities = torch.special.logit(
-                    0.1 * torch.ones((candidate_anchor.shape[0], 1), dtype=torch.float, device="cuda"))
+                    0.1 * torch.ones((candidate_kernel.shape[0], 1), dtype=torch.float, device="cuda"))
 
-                new_feat = self.anchor_feat.unsqueeze(dim=1).repeat([1, self.n_offsets, 1]).view([-1, self.config.feat_dim])[candidate_mask]
+                new_feat = self.kernel_feat.unsqueeze(dim=1).repeat([1, self.n_offsets, 1]).view([-1, self.config.feat_dim])[candidate_mask]
 
                 new_feat = scatter_max(new_feat, inverse_indices.unsqueeze(1).expand(-1, new_feat.size(1)), dim=0)[0][remove_duplicates]
 
-                new_offsets = torch.zeros_like(candidate_anchor).unsqueeze(dim=1).repeat([1, self.n_offsets, 1]).float().cuda()
+                new_offsets = torch.zeros_like(candidate_kernel).unsqueeze(dim=1).repeat([1, self.n_offsets, 1]).float().cuda()
 
                 d = {
-                    "anchor": candidate_anchor,
+                    "kernel": candidate_kernel,
                     "scaling": new_scaling,
                     "rotation": new_rotation,
-                    "anchor_feat": new_feat,
+                    "kernel_feat": new_feat,
                     "offset": new_offsets,
                     "opacity": new_opacities,
                 }
 
-                temp_anchor_denom = torch.cat([self.anchor_denom, torch.zeros([new_opacities.shape[0], 1], device='cuda').float()], dim=0)
-                del self.anchor_denom
-                self.anchor_denom = temp_anchor_denom
+                temp_kernel_denom = torch.cat([self.kernel_denom, torch.zeros([new_opacities.shape[0], 1], device='cuda').float()], dim=0)
+                del self.kernel_denom
+                self.kernel_denom = temp_kernel_denom
 
                 temp_opacity_accum = torch.cat([self.opacity_accum, torch.zeros([new_opacities.shape[0], 1], device='cuda').float()], dim=0)
                 del self.opacity_accum
@@ -1203,44 +1204,44 @@ class GaussianModel(nn.Module):
                 torch.cuda.empty_cache()
 
                 optimizable_tensors = self.cat_tensors_to_optimizer(d)
-                self.anchor = optimizable_tensors["anchor"]
+                self.kernel = optimizable_tensors["kernel"]
                 self.scaling = optimizable_tensors["scaling"]
                 self.rotation = optimizable_tensors["rotation"]
-                self.anchor_feat = optimizable_tensors["anchor_feat"]
+                self.kernel_feat = optimizable_tensors["kernel_feat"]
                 self.offset = optimizable_tensors["offset"]
                 self.opacity = optimizable_tensors["opacity"]
                 if self.config.appearance_enabled:
-                    self.embeddings = optimizable_tensors["embeddings"]
+                    self.appearance_embeddings = optimizable_tensors["appearance_embeddings"]
                 if self.config.uncertainty_enabled:
                     self.uncertainty_embeddings = optimizable_tensors["uncertainty_embeddings"]
 
-    def adjust_anchor(self, check_interval=100, success_threshold=0.8, grad_threshold=0.0002, min_opacity=0.005):
-        # # adding anchors
+    def adjust_kernel(self, check_interval=100, success_threshold=0.8, grad_threshold=0.0002, min_opacity=0.005):
+        # # adding kernels
         grads = self.offset_gradient_accum / self.offset_denom  # [N*k, 1]
         grads[grads.isnan()] = 0.0
         grads_norm = torch.norm(grads, dim=-1)
         offset_mask = (self.offset_denom > check_interval * success_threshold * 0.5).squeeze(dim=1)
 
-        self.anchor_growing(grads_norm, grad_threshold, offset_mask)
+        self.kernel_growing(grads_norm, grad_threshold, offset_mask)
 
         # update offset_denom
         self.offset_denom[offset_mask] = 0
-        padding_offset_denom = torch.zeros([self.anchor.shape[0] * self.n_offsets - self.offset_denom.shape[0], 1],
+        padding_offset_denom = torch.zeros([self.kernel.shape[0] * self.n_offsets - self.offset_denom.shape[0], 1],
                                            dtype=torch.int32,
                                            device=self.offset_denom.device)
         self.offset_denom = torch.cat([self.offset_denom, padding_offset_denom], dim=0)
 
         self.offset_gradient_accum[offset_mask] = 0
         padding_offset_gradient_accum = torch.zeros(
-            [self.anchor.shape[0] * self.n_offsets - self.offset_gradient_accum.shape[0], 1],
+            [self.kernel.shape[0] * self.n_offsets - self.offset_gradient_accum.shape[0], 1],
             dtype=torch.int32,
             device=self.offset_gradient_accum.device)
         self.offset_gradient_accum = torch.cat([self.offset_gradient_accum, padding_offset_gradient_accum], dim=0)
 
-        # # prune anchors
-        prune_mask = (self.opacity_accum < min_opacity * self.anchor_denom).squeeze(dim=1)
-        anchors_mask = (self.anchor_denom > check_interval * success_threshold).squeeze(dim=1)  # [N, 1]
-        prune_mask = torch.logical_and(prune_mask, anchors_mask)  # [N]
+        # # prune kernels
+        prune_mask = (self.opacity_accum < min_opacity * self.kernel_denom).squeeze(dim=1)
+        kernels_mask = (self.kernel_denom > check_interval * success_threshold).squeeze(dim=1)  # [N, 1]
+        prune_mask = torch.logical_and(prune_mask, kernels_mask)  # [N]
 
         # update offset_denom
         offset_denom = self.offset_denom.view([-1, self.n_offsets])[~prune_mask]
@@ -1254,30 +1255,30 @@ class GaussianModel(nn.Module):
         self.offset_gradient_accum = offset_gradient_accum
 
         # update opacity accum
-        if anchors_mask.sum() > 0:
-            self.opacity_accum[anchors_mask] = torch.zeros([anchors_mask.sum(), 1], device='cuda').float()
-            self.anchor_denom[anchors_mask] = torch.zeros([anchors_mask.sum(), 1], device='cuda').float()
+        if kernels_mask.sum() > 0:
+            self.opacity_accum[kernels_mask] = torch.zeros([kernels_mask.sum(), 1], device='cuda').float()
+            self.kernel_denom[kernels_mask] = torch.zeros([kernels_mask.sum(), 1], device='cuda').float()
 
         temp_opacity_accum = self.opacity_accum[~prune_mask]
         del self.opacity_accum
         self.opacity_accum = temp_opacity_accum
 
-        temp_anchor_denom = self.anchor_denom[~prune_mask]
-        del self.anchor_denom
-        self.anchor_denom = temp_anchor_denom
+        temp_kernel_denom = self.kernel_denom[~prune_mask]
+        del self.kernel_denom
+        self.kernel_denom = temp_kernel_denom
 
         if prune_mask.shape[0] > 0:
-            self.prune_anchor(prune_mask)
+            self.prune_kernel(prune_mask)
 
-    def _generate_neural_gaussians(self, camera_center, visible_mask, embedding=None, transient_embedding=None):
+    def _generate_neural_gaussians(self, camera_center, visible_mask, light_embedding=None, transient_embedding=None):
         # view frustum filtering for acceleration
-        feat = self.anchor_feat[visible_mask]
-        anchor = self.anchor[visible_mask]
+        feat = self.kernel_feat[visible_mask]
+        kernel = self.kernel[visible_mask]
         grid_offsets = self.offset[visible_mask]
         grid_scaling = self.get_scaling[visible_mask]
 
-        # get view properties for anchor
-        ob_view = anchor - camera_center
+        # get view properties for kernel
+        ob_view = kernel - camera_center
         # dist
         ob_dist = ob_view.norm(dim=1, keepdim=True)
         # view
@@ -1319,23 +1320,23 @@ class GaussianModel(nn.Module):
             color = self.mlp_color(cat_local_view_wodist)
 
         if self.config.appearance_enabled:
-            embedding_expanded = assert_not_none(embedding)[None].repeat(len(anchor), 1)
+            embedding_expanded = assert_not_none(light_embedding)[None].repeat(len(kernel), 1)
             assert self.appearance_mlp is not None
-            assert self.embeddings is not None
+            assert self.appearance_embeddings is not None
             local_view = torch.cat([ob_view, ob_dist], dim=1) if self.config.add_color_dist else ob_view
-            color_toned = self.appearance_mlp(self.embeddings[visible_mask], embedding_expanded, color, local_view)
-            color_toned = color_toned.reshape([anchor.shape[0] * self.n_offsets, 3])[mask]
+            color_toned = self.appearance_mlp(self.appearance_embeddings[visible_mask], embedding_expanded, color, local_view)
+            color_toned = color_toned.reshape([kernel.shape[0] * self.n_offsets, 3])[mask]
         else:
             color_toned = None
 
-        color = color.reshape([anchor.shape[0] * self.n_offsets, 3])  # [mask]
+        color = color.reshape([kernel.shape[0] * self.n_offsets, 3])  # [mask]
 
         if self.config.uncertainty_enabled and transient_embedding is not None:
-            embedding_expanded = transient_embedding[None].repeat(len(anchor), 1)
+            embedding_expanded = transient_embedding[None].repeat(len(kernel), 1)
             assert self.uncertainty_model is not None
             assert self.uncertainty_embeddings is not None
             uncertainty = self.uncertainty_model(self.uncertainty_embeddings[visible_mask], embedding_expanded)
-            uncertainty = uncertainty.reshape([anchor.shape[0] * self.n_offsets, 1])[mask]
+            uncertainty = uncertainty.reshape([kernel.shape[0] * self.n_offsets, 1])[mask]
         else:
             uncertainty = None
 
@@ -1344,17 +1345,17 @@ class GaussianModel(nn.Module):
             scale_rot = self.mlp_cov(cat_local_view)
         else:
             scale_rot = self.mlp_cov(cat_local_view_wodist)
-        scale_rot = scale_rot.reshape([anchor.shape[0] * self.n_offsets, 7])  # [mask]
+        scale_rot = scale_rot.reshape([kernel.shape[0] * self.n_offsets, 7])  # [mask]
 
         # offsets
         offsets = grid_offsets.view([-1, 3])  # [mask]
 
         # combine for parallel masking
-        concatenated = torch.cat([grid_scaling, anchor], dim=-1)
+        concatenated = torch.cat([grid_scaling, kernel], dim=-1)
         concatenated_repeated = repeat(concatenated, 'n (c) -> (n k) (c)', k=self.n_offsets)
         concatenated_all = torch.cat([concatenated_repeated, color, scale_rot, offsets], dim=-1)
         masked = concatenated_all[mask]
-        scaling_repeat, repeat_anchor, color, scale_rot, offsets = masked.split([6, 3, 3, 7, 3], dim=-1)
+        scaling_repeat, repeat_kernel, color, scale_rot, offsets = masked.split([6, 3, 3, 7, 3], dim=-1)
 
         # post-process cov
         scaling = scaling_repeat[:, 3:] * torch.sigmoid(scale_rot[:, :3])  # * (1+torch.sigmoid(repeat_dist))
@@ -1362,7 +1363,7 @@ class GaussianModel(nn.Module):
 
         # post-process offsets to get centers for gaussians
         offsets = offsets * scaling_repeat[:, :3]
-        xyz = repeat_anchor + offsets
+        xyz = repeat_kernel + offsets
 
         return xyz, color, color_toned, opacity, scaling, rot, neural_opacity, mask, uncertainty
 
@@ -1371,7 +1372,7 @@ class GaussianModel(nn.Module):
                         config: Config,
                         *,
                         scaling_modifier=1.0,
-                        embedding: Optional[torch.Tensor],
+                        light_embedding: Optional[torch.Tensor],
                         transient_embedding: Optional[torch.Tensor] = None,
                         prefilter_voxel: bool = True,
                         retain_grad: bool = False,
@@ -1380,7 +1381,7 @@ class GaussianModel(nn.Module):
         """
         Render the scene.
         """
-        device = self.anchor.device
+        device = self.kernel.device
         assert len(viewpoint_camera.poses.shape) == 2, "Expected a single camera"
         assert viewpoint_camera.image_sizes is not None, "Expected image sizes to be set"
         pose = np.copy(viewpoint_camera.poses)
@@ -1424,13 +1425,13 @@ class GaussianModel(nn.Module):
         if prefilter_voxel:
             visible_mask = self._prefilter_voxel(settings)
         else:
-            visible_mask = torch.ones(self.anchor.shape[0], dtype=torch.bool, device=device)
+            visible_mask = torch.ones(self.kernel.shape[0], dtype=torch.bool, device=device)
 
         xyz, color, color_toned, opacity, scaling, rot, neural_opacity, mask, uncertainty = self._generate_neural_gaussians(
-            camera_center, visible_mask, embedding, transient_embedding)
+            camera_center, visible_mask, light_embedding, transient_embedding)
 
         # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
-        screenspace_points = torch.zeros_like(xyz, dtype=self.anchor.dtype, requires_grad=True, device=device) + 0
+        screenspace_points = torch.zeros_like(xyz, dtype=self.kernel.dtype, requires_grad=True, device=device) + 0
         if retain_grad:
             try:
                 screenspace_points.retain_grad()
@@ -1536,7 +1537,7 @@ class GaussianModel(nn.Module):
         Background tensor (bg_color) must be on GPU!
         """
         # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
-        screenspace_points = torch.zeros_like(self.anchor, dtype=self.anchor.dtype, requires_grad=True,
+        screenspace_points = torch.zeros_like(self.kernel, dtype=self.kernel.dtype, requires_grad=True,
                                               device="cuda") + 0
         try:
             screenspace_points.retain_grad()
@@ -1565,7 +1566,7 @@ class GaussianModel(nn.Module):
         # scaling / rotation by the rasterizer.
         scales = self.get_scaling
         rotations = self.get_rotation
-        radii_pure = rasterizer.visible_filter(means3D=self.anchor,
+        radii_pure = rasterizer.visible_filter(means3D=self.kernel,
                                                scales=scales[:, :3],
                                                rotations=rotations,
                                                cov3D_precomp=None)
@@ -1661,7 +1662,7 @@ class NexusSplats(Method):
         # Setup model
         if self.checkpoint is None:
             xyz = train_dataset["points3D_xyz"]
-            self.model.initialize_from_points3D(xyz, self.cameras_extent)
+            self.model.initialize_from_points(xyz, self.cameras_extent)
             self.model.set_num_training_images(len(train_dataset["cameras"]))
         else:
             self.model.load_state_dict(load_state_dict, strict=False)
@@ -1683,8 +1684,8 @@ class NexusSplats(Method):
             loaded_step=self._loaded_step,
         )
 
-    def optimize_embedding(self, dataset: Dataset, *, embedding: Optional[np.ndarray] = None) -> OptimizeEmbeddingOutput:
-        device = self.model.anchor.device
+    def optimize_embedding(self, dataset: Dataset, *, light_embedding: Optional[np.ndarray] = None) -> OptimizeEmbeddingOutput:
+        device = self.model.kernel.device
         camera = dataset["cameras"].item()
         assert camera.camera_models == camera_model_to_int("pinhole"), "Only pinhole cameras supported"
 
@@ -1692,12 +1693,12 @@ class NexusSplats(Method):
         i = 0
         losses, psnrs, mses = [], [], []
 
-        appearance_embedding = (
-            torch.from_numpy(embedding).to(device) if embedding is not None else self.model.get_embedding(None)
+        light_embedding = (
+            torch.from_numpy(light_embedding).to(device) if light_embedding is not None else self.model.get_light_embedding(None)
         )
         if self.config.appearance_enabled:
-            appearance_embedding_param = torch.nn.Parameter(assert_not_none(appearance_embedding).requires_grad_(True))
-            optimizer = torch.optim.Adam([appearance_embedding_param], lr=self.config.appearance_embedding_optim_lr)
+            light_embedding_param = torch.nn.Parameter(assert_not_none(light_embedding).requires_grad_(True))
+            optimizer = torch.optim.Adam([light_embedding_param], lr=self.config.light_embedding_optim_lr)
 
             gt_image = torch.tensor(convert_image_dtype(dataset["images"][i], np.float32), dtype=torch.float32,
                                     device=device).permute(2, 0, 1)
@@ -1706,11 +1707,11 @@ class NexusSplats(Method):
 
             with torch.enable_grad():
                 app_optim_type = self.config.appearance_optim_type
-                for _ in range(self.config.appearance_embedding_optim_iters):
+                for _ in range(self.config.light_embedding_optim_iters):
                     optimizer.zero_grad()
                     render_pkg = self.model.render_internal(camera,
                                                             config=self.config,
-                                                            embedding=appearance_embedding_param,
+                                                            light_embedding=light_embedding_param,
                                                             transient_embedding=None)
                     image = render_pkg["render"]
                     if gt_mask is not None:
@@ -1730,7 +1731,6 @@ class NexusSplats(Method):
                     else:
                         raise ValueError(f"Unknown appearance optimization type {app_optim_type}")
                     loss.backward()
-                    # TODO: use uncertainty here as well
                     optimizer.step()
 
                     losses.append(loss.detach().cpu().item())
@@ -1739,7 +1739,7 @@ class NexusSplats(Method):
 
             if self.model.optimizer is not None:
                 self.model.optimizer.zero_grad()
-            embedding_np = appearance_embedding_param.detach().cpu().numpy()
+            embedding_np = light_embedding_param.detach().cpu().numpy()
             return {
                 "embedding": embedding_np,
                 "metrics": {
@@ -1754,7 +1754,7 @@ class NexusSplats(Method):
     def render(self, camera: Cameras, options=None, **kwargs) -> RenderOutput:
         del kwargs
         camera = camera.item()
-        device = self.model.anchor.device
+        device = self.model.kernel.device
         assert camera.camera_models == camera_model_to_int("pinhole"), "Only pinhole cameras supported"
         render_depth = False
         if options is not None and "depth" in options.get("outputs", ()):
@@ -1765,14 +1765,14 @@ class NexusSplats(Method):
             _np_embedding = (options or {}).get("embedding", None)
             embedding = (
                 torch.from_numpy(_np_embedding)
-                if _np_embedding is not None else self.model.get_embedding(None)
+                if _np_embedding is not None else self.model.get_light_embedding(None)
             )
             del _np_embedding
             embedding = embedding.to(device) if embedding is not None else None
 
             out = self.model.render_internal(camera,
                                              config=self.config,
-                                             embedding=embedding,
+                                             light_embedding=embedding,
                                              render_depth=render_depth)
             image = out["render"]
             image = torch.clamp(image, 0.0, 1.0).nan_to_num_(0.0)
@@ -1808,7 +1808,7 @@ class NexusSplats(Method):
 
         self.model.train()
         self.model.update_learning_rate(iteration)
-        device = self.model.anchor.device
+        device = self.model.kernel.device
 
         # Pick a random Camera
         if not self._viewpoint_stack:
@@ -1821,10 +1821,10 @@ class NexusSplats(Method):
         # Render
         # NOTE: random background color is not supported
 
-        embedding = self.model.get_embedding(train_image_id=camera_id)
+        light_embedding = self.model.get_light_embedding(train_image_id=camera_id)
         transient_embedding = self.model.get_transient_embedding(train_image_id=camera_id)
         retain_grad = iteration < self.config.update_until
-        render_pkg = self.model.render_internal(viewpoint_cam, config=self.config, embedding=embedding,
+        render_pkg = self.model.render_internal(viewpoint_cam, config=self.config, light_embedding=light_embedding,
                                                 transient_embedding=transient_embedding, retain_grad=retain_grad)
         image_toned, image, scaling, opacity = render_pkg["render"], render_pkg["raw_render"], render_pkg["scaling"], render_pkg["neural_opacity"]
         viewspace_point_tensor, visibility_filter = render_pkg["viewspace_points"], render_pkg["visibility_filter"]
@@ -1888,7 +1888,7 @@ class NexusSplats(Method):
                 "mse": mse.detach().mean().cpu().item(),
                 "loss": loss.detach().cpu().item(),
                 "psnr": psnr_value.detach().cpu().item(),
-                "num_anchors": len(self.model.anchor),
+                "num_kernels": len(self.model.kernel),
             })
 
             def _reduce_masked(tensor, mask):
@@ -1910,7 +1910,7 @@ class NexusSplats(Method):
 
                 # densification
                 if iteration > self.config.update_from and iteration % self.config.update_interval == 0:
-                    self.model.adjust_anchor(check_interval=self.config.update_interval,
+                    self.model.adjust_kernel(check_interval=self.config.update_interval,
                                              success_threshold=self.config.success_threshold,
                                              grad_threshold=self.config.densify_grad_threshold,
                                              min_opacity=self.config.min_opacity)
@@ -1931,7 +1931,7 @@ class NexusSplats(Method):
         return metrics
 
     def get_train_embedding(self, index: int) -> Optional[np.ndarray]:
-        embed = self.model.get_embedding(index)
+        embed = self.model.get_light_embedding(index)
         if embed is not None:
             return embed.detach().cpu().numpy()
         return embed
