@@ -29,7 +29,9 @@ Experimental results demonstrate that NexusSplats achieves state-of-the-art rend
 <img width="100%" alt="overview of NexusSplats" src="assets/overview.png" />
 
 ## Installation
-Clone the repository and create a `python == 3.11` Anaconda environment with CUDA toolkit 11.8 installed using
+Clone the repository and create a `python == 3.11` Anaconda environment with CUDA toolkit 11.8.
+Our code is implemented based on [NerfBaselines](https://github.com/nerfbaselines/nerfbaselines).
+Install the dependencies and the codebase:
 ```bash
 git clone git@github.com:juliantang324/NexusSplats.git
 cd NexusSplats
@@ -90,7 +92,8 @@ There are several concurrent works that also aim to extend 3DGS to handle in-the
 </ul>
 
 ## Acknowledgements
-We sincerely appreciate the authors of [3DGS](https://github.com/graphdeco-inria/gaussian-splatting) and [NerfBaselines](https://github.com/nerfbaselines/nerfbaselines) for their great work and released code.
+We sincerely appreciate the authors of [3DGS](https://github.com/graphdeco-inria/gaussian-splatting) and [NerfBaselines](https://github.com/nerfbaselines/nerfbaselines) 
+for their great work and released code.
 Please follow their licenses when using our code.
 
 ## Citation
