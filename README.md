@@ -96,6 +96,7 @@ We sincerely appreciate the authors of [3DGS](https://github.com/graphdeco-inria
 for their great work and released code.
 Please follow their licenses when using our code.
 
+
 ## Citation
 
 If you find our code or paper useful, please cite:
