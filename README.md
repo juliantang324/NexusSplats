@@ -13,7 +13,7 @@
   </p>
   <p align="center">School of Informatics, Xiamen University</p>
 
-[//]: # (  <h3 align="center"><a href="https://arxiv.org/pdf/2407.08447">📄 Paper</a> | <a href="https://wild-gaussians.github.io/">🌐 Project Page</a></h3>)
+  <h3 align="center"><a href="https://arxiv.org/abs/2411.14514">📄 Paper</a> | <a>🌐 Project Page</a></h3>
 <br/>
 <p align="center">
   <img width="100%" alt="NexusSplats model appearance" src="assets/ours.webp" />
@@ -46,14 +46,21 @@ pip install -e ./submodules/diff-gaussian-rasterization ./submodules/simple-knn
 pip install -e .
 ```
 
-## Interactive viewer
-To start the viewer and explore the trained models, run one of the following:
-```bash
-# Photo Tourism
-ns viewer --checkpoint https://github.com/juliantang324/NexusSplats/releases/tag/v1.0.0/phototourism.zip/trevi-fountain/checkpoint --data external://phototourism/trevi-fountain
-ns viewer --checkpoint https://github.com/juliantang324/NexusSplats/releases/tag/v1.0.0/phototourism.zip/sacre-coeur/checkpoint --data external://phototourism/sacre-coeur
-ns viewer --checkpoint https://github.com/juliantang324/NexusSplats/releases/tag/v1.0.0/phototourism.zip/brandenburg-gate/checkpoint --data external://phototourism/brandenburg-gate
-```
+[//]: # (## Interactive viewer)
+
+[//]: # (To start the viewer and explore the trained models, run one of the following:)
+
+[//]: # (```bash)
+
+[//]: # (# Photo Tourism)
+
+[//]: # (ns viewer --checkpoint https://github.com/juliantang324/NexusSplats/releases/tag/v1.0.0/phototourism.zip/trevi-fountain/checkpoint --data external://phototourism/trevi-fountain)
+
+[//]: # (ns viewer --checkpoint https://github.com/juliantang324/NexusSplats/releases/tag/v1.0.0/phototourism.zip/sacre-coeur/checkpoint --data external://phototourism/sacre-coeur)
+
+[//]: # (ns viewer --checkpoint https://github.com/juliantang324/NexusSplats/releases/tag/v1.0.0/phototourism.zip/brandenburg-gate/checkpoint --data external://phototourism/brandenburg-gate)
+
+[//]: # (```)
 
 ## Training
 To start the training on the Photo Tourism dataset, run one of following commands:
@@ -83,9 +90,17 @@ There are several concurrent works that also aim to extend 3DGS to handle in-the
 We sincerely appreciate the authors of [3DGS](https://github.com/graphdeco-inria/gaussian-splatting) and [NerfBaselines](https://github.com/nerfbaselines/nerfbaselines) for their great work and released code.
 Please follow their licenses when using our code.
 
-[//]: # (## Citation)
+## Citation
 
-[//]: # (If you find our code or paper useful, please cite:)
+If you find our code or paper useful, please cite:
 ```bibtex
-
+@misc{tang2024nexussplatsefficient3dgaussian,
+      title={NexusSplats: Efficient 3D Gaussian Splatting in the Wild}, 
+      author={Yuzhou Tang and Dejun Xu and Yongjie Hou and Zhenzhong Wang and Min Jiang},
+      year={2024},
+      eprint={2411.14514},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2411.14514}, 
+}
 ```
