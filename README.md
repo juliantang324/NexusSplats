@@ -13,7 +13,7 @@
   </p>
   <p align="center">School of Informatics, Xiamen University</p>
 
-  <h3 align="center"><a href="https://arxiv.org/abs/2411.14514">📄 Paper</a> | <a href="https://nexus-splats.github.io/">🌐 Project Page</a></h3>
+  <h3 align="center"><a href="https://arxiv.org/pdf/2411.14514v2">📄 Paper</a> | <a href="https://nexus-splats.github.io/">🌐 Project Page</a></h3>
 <br/>
 <p align="center">
   <img width="100%" alt="NexusSplats model appearance" src="assets/ours.webp" />
