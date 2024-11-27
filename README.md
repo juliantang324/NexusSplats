@@ -9,11 +9,14 @@
     ·
     Zhenzhong Wang
     ·
-    Min Jiang
+    Min Jiang*
   </p>
-  <p align="center">School of Informatics, Xiamen University</p>
+  <p align="center">Xiamen University</p>
 
-  <h3 align="center"><a href="https://arxiv.org/pdf/2411.14514v2">📄 Paper</a> | <a href="https://nexus-splats.github.io/">🌐 Project Page</a></h3>
+  <div align="center">
+    <a href="https://arxiv.org/pdf/2411.14514v2"><img src='https://img.shields.io/badge/arXiv-2411.14514v2-b31b1b'></a>
+    <a href="https://nexus-splats.github.io/"><img src='https://img.shields.io/badge/Project-Page-blue'></a>
+  </div>
 <br/>
 <p align="center">
   <img width="100%" alt="NexusSplats model appearance" src="assets/ours.webp"/>
