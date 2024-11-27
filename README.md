@@ -16,17 +16,31 @@
   <h3 align="center"><a href="https://arxiv.org/pdf/2411.14514v2">📄 Paper</a> | <a href="https://nexus-splats.github.io/">🌐 Project Page</a></h3>
 <br/>
 <p align="center">
-  <img width="100%" alt="NexusSplats model appearance" src="assets/ours.webp" />
+  <img width="100%" alt="NexusSplats model appearance" src="assets/ours.webp"/>
 </p>
 
-<p align="justify">
-we propose a nexus kernel-driven approach, called NexusSplats, for efficient and finer 3D scene reconstruction under complex lighting and occlusion conditions.
-Experimental results demonstrate that NexusSplats achieves state-of-the-art rendering quality and reduces reconstruction time in different scenes by up to 70.4% compared to the current best method in quality.
-</p>
 <br>
 
+## News
+
+**[2024.11.25]** 🎈 We have released the codebase for NexusSplats.
+
+## TODO List
+- [x] Codebase release
+- [ ] Pretrained models
+
+## Abstract
+we propose a nexus kernel-driven approach, called NexusSplats, for efficient and finer 3D scene reconstruction under complex lighting and occlusion conditions.
+Experimental results demonstrate that NexusSplats achieves state-of-the-art rendering quality and reduces reconstruction time in different scenes by up to 70.4% compared to the current best method in quality.
+<br>
 
 <img width="100%" alt="overview of NexusSplats" src="assets/overview.png" />
+<em>Left:</em> From the reference image, we extract light embedding and transient embedding to capture
+global lighting and occlusion conditions. <em>Middle:</em> Our nexus kernels enable hierarchical management
+of Gaussian primitives, allowing efficient local adaptations to different lighting and occlusion conditions
+via the light decoupling module and the uncertainty splatting module. <em>Right:</em> Through tile
+rasterization, we project raw colors, mapped colors, and uncertainties onto 2D visible planes. A boundary
+penalty finally refines the filtering mask in handling occlusions.
 
 ## Installation
 Clone the repository and create a `python == 3.11` Anaconda environment with CUDA toolkit 11.8.
@@ -47,42 +61,25 @@ pip install -e ./submodules/diff-gaussian-rasterization ./submodules/simple-knn
 pip install -e .
 ```
 
-[//]: # (## Interactive viewer)
-
-[//]: # (To start the viewer and explore the trained models, run one of the following:)
-
-[//]: # (```bash)
-
-[//]: # (# Photo Tourism)
-
-[//]: # (ns viewer --checkpoint https://github.com/juliantang324/NexusSplats/releases/tag/v1.0.0/phototourism.zip/trevi-fountain/checkpoint --data external://phototourism/trevi-fountain)
-
-[//]: # (ns viewer --checkpoint https://github.com/juliantang324/NexusSplats/releases/tag/v1.0.0/phototourism.zip/sacre-coeur/checkpoint --data external://phototourism/sacre-coeur)
-
-[//]: # (ns viewer --checkpoint https://github.com/juliantang324/NexusSplats/releases/tag/v1.0.0/phototourism.zip/brandenburg-gate/checkpoint --data external://phototourism/brandenburg-gate)
-
-[//]: # (```)
-
 ## Training
 To start the training on the Photo Tourism dataset, run one of following commands:
 ```bash
-# Photo Tourism
 ns train --data external://phototourism/trevi-fountain
 ns train --data external://phototourism/sacre-coeur
 ns train --data external://phototourism/brandenburg-gate
 ```
 
-The training will also generate output artifacts containing the **test set predictions**, **checkpoint**, and **tensorboard logs**.
+## Evaluation
+To evaluate the trained model on the Photo Tourism dataset, run the following commands:
+```bash
+# render predictions
+ns render --checkpoint {checkpoint} --data external://phototourism/trevi-fountain --output {output_path}
+ns render --checkpoint {checkpoint} --data external://phototourism/sacre-coeur --output {output_path}
+ns render --checkpoint {checkpoint} --data external://phototourism/brandenburg-gate --output {output_path}
 
-[//]: # (## Rendering videos)
-
-[//]: # (To render a video on a trajectory &#40;e.g., generated from the interactive viewer&#41;, run:)
-
-[//]: # (```bash)
-
-[//]: # (ns render-trajectory --checkpoint {checkpoint} --trajectory {trajectory file})
-
-[//]: # (```)
+# evaluate predictions
+ns evaluate {path/to/predictions} --output results.json
+```
 
 ## Concurrent works
 There are several concurrent works that also aim to extend 3DGS to handle in-the-wild scenarios:
