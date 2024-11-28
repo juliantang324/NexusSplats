@@ -99,15 +99,12 @@ Please follow their licenses when using our code.
 
 ## Citation
 
-If you find our code or paper useful, please cite:
+If you find our code or paper useful, please star this repository and cite:
 ```bibtex
-@misc{tang2024nexussplatsefficient3dgaussian,
-      title={NexusSplats: Efficient 3D Gaussian Splatting in the Wild}, 
-      author={Yuzhou Tang and Dejun Xu and Yongjie Hou and Zhenzhong Wang and Min Jiang},
-      year={2024},
-      eprint={2411.14514},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV},
-      url={https://arxiv.org/abs/2411.14514}, 
+@article{tang2024nexussplats,
+    title={NexusSplats: Efficient 3D Gaussian Splatting in the Wild},
+    author={Tang, Yuzhou and Xu, Dejun and Hou, Yongjie and Wang, Zhenzhong and Jiang, Min},
+    journal={arXiv preprint arXiv:2411.14514},
+    year={2024}
 }
 ```
