@@ -457,7 +457,7 @@ class TensorboardLoggerEvent(BaseLoggerEvent):
             assert label_img_size is not None, "label_img_size should not be None"
             embedding_info.sprite.image_path = str(subdir / "sprite.png")
             embedding_info.sprite.single_image_dim.extend(label_img_size)
-        projector_config.light_embeddings.extend([embedding_info])
+        projector_config.embeddings.extend([embedding_info])
 
         config_pbtxt = text_format.MessageToString(projector_config)
         with (Path(self._logdir) / "projector_config.pbtxt").open("wb") as f:
