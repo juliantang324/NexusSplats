@@ -31,6 +31,7 @@
 ## TODO List
 - [x] Codebase release
 - [ ] Pretrained models
+- [ ] Merge with the latest version of NerfBaselines
 
 ## Abstract
 we propose a nexus kernel-driven approach, called NexusSplats, for efficient and finer 3D scene reconstruction under complex lighting and occlusion conditions.

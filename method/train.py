@@ -339,20 +339,6 @@ def train_command(
             eval_few_custom(method, logger, test_dataset_eval_few, split="test", step=step,
                             evaluation_protocol=evaluation_protocol)
 
-        if step % 10_000 == 0:
-            # Display embeddings
-            logging.info(f"logging embeddings at step {step}")
-            labels = [{
-                "name": os.path.relpath(x, train_dataset["image_paths_root"]),
-                "id": i,
-            } for i, x in enumerate(train_dataset["image_paths"])]
-            if method.model.appearance_embeddings is not None:
-                logger.add_embedding("train/appearance-embeddings",
-                                     method.model.appearance_embeddings.detach().cpu().numpy(),
-                                     images=train_images_thumbnails,
-                                     labels=labels,
-                                     step=step)
-
     logging.info(f"evaluating on all images as step {step}")
     eval_all(method, logger, test_dataset, split="test", step=step, output=str(output_path),
              evaluation_protocol=evaluation_protocol, nb_info={})
