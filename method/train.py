@@ -231,6 +231,7 @@ def log_memory_usage():
               help="When to evaluate on few images")
 @click.option("--set", "config_overrides", help="Override a parameter in the method.", type=SetParamOptionType(),
               multiple=True, default=None)
+@click.option("--display-embeddings", is_flag=True)
 def train_command(
         data,
         output,
@@ -239,6 +240,7 @@ def train_command(
         dataset_type="phototourism",
         config_overrides=None,
         debug=False,
+        display_embeddings=False,
 ):
     if debug:
         import torch
@@ -338,6 +340,20 @@ def train_command(
                             evaluation_protocol=evaluation_protocol)
             eval_few_custom(method, logger, test_dataset_eval_few, split="test", step=step,
                             evaluation_protocol=evaluation_protocol)
+
+        if step % 10_000 == 0 and display_embeddings:
+            # Display embeddings
+            logging.info(f"logging embeddings at step {step}")
+            labels = [{
+                "name": os.path.relpath(x, train_dataset["image_paths_root"]),
+                "id": i,
+            } for i, x in enumerate(train_dataset["image_paths"])]
+            if method.model.light_embeddings is not None:
+                logger.add_embedding("train/light-embeddings",
+                                     method.model.light_embeddings.detach().cpu().numpy(),
+                                     images=train_images_thumbnails,
+                                     labels=labels,
+                                     step=step)
 
     logging.info(f"evaluating on all images as step {step}")
     eval_all(method, logger, test_dataset, split="test", step=step, output=str(output_path),
