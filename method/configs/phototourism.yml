@@ -1,39 +1,13 @@
 iterations: 200000
 
-position_lr_max_steps: 200000
-position_lr_final: 0.0
-position_lr_init: 0.0
-
-offset_lr_max_steps: 200000
-offset_lr_init: 0.01
-offset_lr_final: 0.00001
-
-mlp_opacity_lr_max_steps: 200000
-mlp_opacity_lr_init: 0.002
-mlp_opacity_lr_final: 0.000002
-
-mlp_cov_lr_max_steps: 200000
-mlp_cov_lr_init: 0.004
-mlp_cov_lr_final: 0.004
-
-mlp_color_lr_max_steps: 200000
-mlp_color_lr_init: 0.008
-mlp_color_lr_final: 0.000005
-
-mlp_featurebank_lr_max_steps: 200000
-mlp_featurebank_lr_init: 0.01
-mlp_featurebank_lr_final: 0.00001
-
-scaling_lr: 0.0007
+num_sky_gaussians: 100000
 
 uncertainty_enabled: true
 uncertainty_warmup_start: 35000
 uncertainty_warmup_iters: 5000
 uncertainty_mode: "dino"
-use_boundary_penalty: true
 
+use_boundary_penalty: true
 appearance_enabled: true
 appearance_n_fourier_freqs: 5
 appearance_dropout: 0.2
-
-num_sky_gaussians: 100000
