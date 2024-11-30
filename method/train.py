@@ -45,11 +45,11 @@ def eval_all(method: Method, logger: Logger, dataset: Dataset, *, output: str, s
         prefix = Path(os.path.commonpath(dataset["image_paths"]))
 
     if split != "test":
-        output_metrics = os.path.join(output, f"results-{split}.json")
-        output = os.path.join(output, f"predictions-{split}.tar.gz")
+        output_metrics = os.path.join(output, f"results-{split}-{step}.json")
+        output = os.path.join(output, f"predictions-{split}-{step}.tar.gz")
     else:
-        output_metrics = os.path.join(output, f"results.json")
-        output = os.path.join(output, f"predictions.tar.gz")
+        output_metrics = os.path.join(output, f"results-{step}.json")
+        output = os.path.join(output, f"predictions-{step}.tar.gz")
 
     if os.path.exists(output):
         if os.path.isfile(output):
@@ -309,7 +309,7 @@ def train_command(
 
     num_iterations = info["num_iterations"]
     assert num_iterations is not None, "num_iterations must be set in the config"
-    step = 0
+
     for step in (pbar := tqdm(range(num_iterations), miniters=10, desc="training", disable=debug)):
         metrics = method.train_iteration(step)
         step += 1
@@ -355,15 +355,16 @@ def train_command(
                                      labels=labels,
                                      step=step)
 
-    logging.info(f"evaluating on all images as step {step}")
-    eval_all(method, logger, test_dataset, split="test", step=step, output=str(output_path),
-             evaluation_protocol=evaluation_protocol, nb_info={})
-    if evaluation_protocol.get_name() == "nerfw":
-        eval_all(method, logger, train_dataset_eval_few, split="trainsubset", step=step, output=str(output_path),
-                 evaluation_protocol=evaluation_protocol, nb_info={})
-    else:
-        eval_all(method, logger, train_dataset, split="train", step=step, output=str(output_path),
-                 evaluation_protocol=evaluation_protocol, nb_info={})
+        if step % 10_000 == 0 and step >= 0.75 * num_iterations:
+            logging.info(f"evaluating on all images as step {step}")
+            eval_all(method, logger, test_dataset, split="test", step=step, output=str(output_path),
+                     evaluation_protocol=evaluation_protocol, nb_info={})
+            if evaluation_protocol.get_name() == "nerfw":
+                eval_all(method, logger, train_dataset_eval_few, split="trainsubset", step=step, output=str(output_path),
+                         evaluation_protocol=evaluation_protocol, nb_info={})
+            else:
+                eval_all(method, logger, train_dataset, split="train", step=step, output=str(output_path),
+                         evaluation_protocol=evaluation_protocol, nb_info={})
 
     # Save final checkpoint
     if step % 10_000 != 0:
