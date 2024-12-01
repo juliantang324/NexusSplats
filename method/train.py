@@ -321,6 +321,7 @@ def train_command(
             acc_metrics_values = acc_metrics.pop()
             pbar.set_postfix({"train/loss": f"{acc_metrics_values['loss']:.4f}", "psnr": f"{acc_metrics_values['psnr']:.4f}"})
             with logger.add_event(step) as event:
+                event.add_scalar(f"train/GPU memory usage (MB)", log_memory_usage() / (1024 ** 2))
                 for k, val in acc_metrics_values.items():
                     event.add_scalar(f"train/{k}", val)
 
