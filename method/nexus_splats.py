@@ -1919,13 +1919,15 @@ class NexusSplats(Method):
                 del self.model.opacity_accum
                 del self.model.offset_gradient_accum
                 del self.model.offset_denom
-                stats = torch.cuda.memory_stats()
-                allocated_memory = stats["allocated_bytes.all.current"]
-                reserved_memory = stats["reserved_bytes.all.current"]
-                allocated = (allocated_memory + reserved_memory) / (1024 ** 3)
-                if allocated > 10:
-                    torch.cuda.empty_cache()
-                    logging.info(f"Memory usage: {allocated:.2f} GB. Clearing cache...")
+                del self.model.kernel_denom
+
+            stats = torch.cuda.memory_stats()
+            allocated_memory = stats["allocated_bytes.all.current"]
+            reserved_memory = stats["reserved_bytes.all.current"]
+            allocated = (allocated_memory + reserved_memory) / (1024 ** 3)
+            if allocated > 10 and iteration >= self.config.update_until:
+                torch.cuda.empty_cache()
+                logging.info(f"Memory usage: {allocated:.2f} GB. Clearing cache...")
 
             # Optimizer step
             if iteration < self.config.iterations:

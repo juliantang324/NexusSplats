@@ -14,7 +14,7 @@
   <p align="center">Xiamen University</p>
 
   <div align="center">
-    <a href="https://arxiv.org/pdf/2411.14514v2"><img src='https://img.shields.io/badge/arXiv-2411.14514v2-b31b1b'></a>
+    <a href="https://arxiv.org/pdf/2411.14514v4"><img src='https://img.shields.io/badge/arXiv-2411.14514-b31b1b'></a>
     <a href="https://nexus-splats.github.io/"><img src='https://img.shields.io/badge/Project-Page-blue'></a>
   </div>
 <br/>
