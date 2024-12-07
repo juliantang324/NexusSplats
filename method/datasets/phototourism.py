@@ -217,7 +217,7 @@ def horizontal_half_dataset(dataset: Dataset, left: bool = True) -> Dataset:
 
 class NerfWEvaluationProtocol(EvaluationProtocol):
     def __init__(self):
-        from mygaussians.evaluation import compute_metrics
+        from ..evaluation import compute_metrics
         self._compute_metrics = compute_metrics
 
     def get_name(self):
