@@ -666,6 +666,7 @@ class GaussianModel(nn.Module):
 
         self._dynamically_sized_props = [
             "kernel", "offset", "kernel_feat", "scaling", "rotation", "opacity",
+            "opacity_accum", "offset_gradient_accum", "offset_denom", "kernel_denom",
             "appearance_embeddings", "uncertainty_embeddings",
         ]
 
