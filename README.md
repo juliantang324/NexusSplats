@@ -1,20 +1,20 @@
 <p align="center">
 <h1 align="center">NexusSplats: Efficient 3D Gaussian Splatting in the Wild</h1>
   <p align="center">
-    Yuzhou Tang
+    <a href="https://juliantang324.github.io/">Yuzhou Tang</a>
     ·
-    Dejun Xu
+    <a href="https://orcid.org/0000-0001-6272-0941">Dejun Xu</a>
     ·
-    Yongjie Hou
+    <a href="https://github.com/Maximilian1794">Yongjie Hou</a>
     ·
-    Zhenzhong Wang
+    <a href="https://zhenzhongxmu.github.io/">Zhenzhong Wang</a>
     ·
-    Min Jiang*
+    <a href="https://minjiang.xmu.edu.cn/">Min Jiang</a>*
   </p>
   <p align="center">Xiamen University</p>
 
   <div align="center">
-    <a href="https://arxiv.org/pdf/2411.14514v4"><img src='https://img.shields.io/badge/arXiv-2411.14514-b31b1b'></a>
+    <a href="https://arxiv.org/pdf/2411.14514"><img src='https://img.shields.io/badge/arXiv-2411.14514-b31b1b'></a>
     <a href="https://nexus-splats.github.io/"><img src='https://img.shields.io/badge/Project-Page-blue'></a>
   </div>
 <br/>
