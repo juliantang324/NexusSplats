@@ -623,8 +623,8 @@ class GaussianModel(nn.Module):
     offset_gradient_accum: Tensor
     offset_denom: Tensor
     kernel_denom: Tensor
-    appearance_embeddings: Optional[nn.Parameter]
     light_embeddings: Optional[nn.Parameter]
+    appearance_embeddings: Optional[nn.Parameter]
     appearance_mlp: Optional[LightDecoupling]
 
     # Setup functions
@@ -659,10 +659,10 @@ class GaussianModel(nn.Module):
         self.register_parameter("rotation", cast(nn.Parameter, nn.Parameter(torch.empty(0, 4, dtype=torch.float32, requires_grad=False))))
         self.register_parameter("opacity", cast(nn.Parameter, nn.Parameter(torch.empty(0, 1, dtype=torch.float32, requires_grad=False))))
 
-        self.register_buffer("opacity_accum", torch.empty(0))
-        self.register_buffer("offset_gradient_accum", torch.empty(0))
-        self.register_buffer("offset_denom", torch.empty(0))
-        self.register_buffer("kernel_denom", torch.empty(0))
+        self.register_buffer("opacity_accum", torch.empty(0, 1, dtype=torch.float32))
+        self.register_buffer("offset_gradient_accum", torch.empty(0, 1, dtype=torch.float32))
+        self.register_buffer("offset_denom", torch.empty(0, 1, dtype=torch.float32))
+        self.register_buffer("kernel_denom", torch.empty(0, 1, dtype=torch.float32))
 
         self._dynamically_sized_props = [
             "kernel", "offset", "kernel_feat", "scaling", "rotation", "opacity",
@@ -704,16 +704,13 @@ class GaussianModel(nn.Module):
         if self.config.appearance_enabled:
             self.register_parameter("light_embeddings", cast(nn.Parameter, nn.Parameter(
                 torch.empty(0, config.light_embedding_dim, dtype=torch.float32, requires_grad=True))))
-        else:
-            self.light_embeddings = None
-
-        if self.config.appearance_enabled:
             self.register_parameter("appearance_embeddings", cast(nn.Parameter, nn.Parameter(torch.empty(
                 0, 6 * self.config.appearance_n_fourier_freqs, dtype=torch.float32, requires_grad=True))))
             self.appearance_mlp = LightDecoupling(config)
         else:
-            self.appearance_mlp = None
+            self.light_embeddings = None
             self.appearance_embeddings = None
+            self.appearance_mlp = None
 
         if self.config.uncertainty_enabled:
             self.register_parameter("transient_embeddings", cast(nn.Parameter, nn.Parameter(
@@ -777,10 +774,6 @@ class GaussianModel(nn.Module):
         self.scaling.data.copy_(scales)
         self.rotation.data.copy_(rots)
         self.opacity.data.copy_(opacities)
-        self.opacity_accum = torch.zeros((fused_point_cloud.shape[0], 1), device="cuda")
-        self.offset_gradient_accum = torch.zeros((fused_point_cloud.shape[0] * self.n_offsets, 1), device="cuda")
-        self.offset_denom = torch.zeros((fused_point_cloud.shape[0] * self.n_offsets, 1), device="cuda")
-        self.kernel_denom = torch.zeros((fused_point_cloud.shape[0], 1), device="cuda")
         if self.appearance_embeddings is not None:
             embeddings = _get_fourier_features(points, num_features=self.config.appearance_n_fourier_freqs)
             embeddings.add_(torch.randn_like(embeddings) * 0.0001)
@@ -912,7 +905,10 @@ class GaussianModel(nn.Module):
         for name in self._dynamically_sized_props:
             if getattr(self, name, None) is None:
                 continue
-            self._resize_parameter(name, (num_points, *getattr(self, name).shape[1:]))
+            if name in ("offset_gradient_accum", "offset_denom"):
+                self._resize_parameter(name, (num_points * self.n_offsets, *getattr(self, name).shape[1:]))
+            else:
+                self._resize_parameter(name, (num_points, *getattr(self, name).shape[1:]))
 
     def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys,
                               error_msgs):
@@ -1103,7 +1099,6 @@ class GaussianModel(nn.Module):
 
     def prune_kernel(self, mask):
         valid_points_mask = ~mask
-
         optimizable_tensors = self._prune_kernel_optimizer(valid_points_mask)
 
         self.kernel = optimizable_tensors["kernel"]
@@ -1151,7 +1146,7 @@ class GaussianModel(nn.Module):
             selected_grid_coords_unique, inverse_indices = torch.unique(selected_grid_coords, return_inverse=True,
                                                                         dim=0)
 
-            ## split data for reducing peak memory calling
+            # split data for reducing peak memory calling
             use_chunk = True
             if use_chunk:
                 chunk_size = 4096
@@ -1159,8 +1154,7 @@ class GaussianModel(nn.Module):
                 remove_duplicates_list = []
                 for i in range(max_iters):
                     cur_remove_duplicates = (selected_grid_coords_unique.unsqueeze(1) ==
-                                             grid_coords[i * chunk_size:(i + 1) * chunk_size, :]).all(-1).any(-1).view(
-                        -1)
+                                             grid_coords[i * chunk_size:(i + 1) * chunk_size, :]).all(-1).any(-1).view(-1)
                     remove_duplicates_list.append(cur_remove_duplicates)
 
                 remove_duplicates = reduce(torch.logical_or, remove_duplicates_list)
@@ -1175,14 +1169,9 @@ class GaussianModel(nn.Module):
                 new_scaling = torch.log(new_scaling)
                 new_rotation = torch.zeros([candidate_kernel.shape[0], 4], device=candidate_kernel.device).float()
                 new_rotation[:, 0] = 1.0
-
-                new_opacities = torch.special.logit(
-                    0.1 * torch.ones((candidate_kernel.shape[0], 1), dtype=torch.float, device="cuda"))
-
+                new_opacities = torch.special.logit(0.1 * torch.ones((candidate_kernel.shape[0], 1), dtype=torch.float, device="cuda"))
                 new_feat = self.kernel_feat.unsqueeze(dim=1).repeat([1, self.n_offsets, 1]).view([-1, self.config.feat_dim])[candidate_mask]
-
                 new_feat = scatter_max(new_feat, inverse_indices.unsqueeze(1).expand(-1, new_feat.size(1)), dim=0)[0][remove_duplicates]
-
                 new_offsets = torch.zeros_like(candidate_kernel).unsqueeze(dim=1).repeat([1, self.n_offsets, 1]).float().cuda()
 
                 d = {
@@ -1228,15 +1217,13 @@ class GaussianModel(nn.Module):
         # update offset_denom
         self.offset_denom[offset_mask] = 0
         padding_offset_denom = torch.zeros([self.kernel.shape[0] * self.n_offsets - self.offset_denom.shape[0], 1],
-                                           dtype=torch.int32,
-                                           device=self.offset_denom.device)
+                                           dtype=torch.int32, device=self.offset_denom.device)
         self.offset_denom = torch.cat([self.offset_denom, padding_offset_denom], dim=0)
 
         self.offset_gradient_accum[offset_mask] = 0
         padding_offset_gradient_accum = torch.zeros(
             [self.kernel.shape[0] * self.n_offsets - self.offset_gradient_accum.shape[0], 1],
-            dtype=torch.int32,
-            device=self.offset_gradient_accum.device)
+            dtype=torch.int32, device=self.offset_gradient_accum.device)
         self.offset_gradient_accum = torch.cat([self.offset_gradient_accum, padding_offset_gradient_accum], dim=0)
 
         # # prune kernels
@@ -1567,21 +1554,16 @@ class GaussianModel(nn.Module):
         # scaling / rotation by the rasterizer.
         scales = self.get_scaling
         rotations = self.get_rotation
-        radii_pure = rasterizer.visible_filter(means3D=self.kernel,
-                                               scales=scales[:, :3],
-                                               rotations=rotations,
-                                               cov3D_precomp=None)
+        radii_pure = rasterizer.visible_filter(means3D=self.kernel, scales=scales[:, :3],
+                                               rotations=rotations, cov3D_precomp=None)
         return radii_pure > 0
 
 
 class NexusSplats(Method):
     config_overrides: Optional[dict] = None
 
-    def __init__(self,
-                 *,
-                 checkpoint: Optional[Path] = None,
-                 train_dataset: Optional[Dataset] = None,
-                 config_overrides: Optional[dict] = None):
+    def __init__(self, *, checkpoint: Optional[Path] = None,
+                 train_dataset: Optional[Dataset] = None, config_overrides: Optional[dict] = None):
         self.optimizer = None
         self.checkpoint = checkpoint
         self.step = 0
@@ -1673,7 +1655,7 @@ class NexusSplats(Method):
     @classmethod
     def get_method_info(cls) -> MethodInfo:
         return MethodInfo(
-            method_id="method",  # Will be filled by the registry
+            method_id="nexus-splats",  # Will be filled by the registry
             required_features=frozenset(("color", "points3D_xyz")),
             supported_camera_models=frozenset(("pinhole",)),
         )
@@ -1685,7 +1667,7 @@ class NexusSplats(Method):
             loaded_step=self._loaded_step,
         )
 
-    def optimize_embedding(self, dataset: Dataset, *, light_embedding: Optional[np.ndarray] = None) -> OptimizeEmbeddingOutput:
+    def optimize_embedding(self, dataset: Dataset, *, embedding: Optional[np.ndarray] = None) -> OptimizeEmbeddingOutput:
         device = self.model.kernel.device
         camera = dataset["cameras"].item()
         assert camera.camera_models == camera_model_to_int("pinhole"), "Only pinhole cameras supported"
@@ -1694,11 +1676,11 @@ class NexusSplats(Method):
         i = 0
         losses, psnrs, mses = [], [], []
 
-        light_embedding = (
-            torch.from_numpy(light_embedding).to(device) if light_embedding is not None else self.model.get_light_embedding(None)
+        embedding = (
+            torch.from_numpy(embedding).to(device) if embedding is not None else self.model.get_light_embedding(None)
         )
         if self.config.appearance_enabled:
-            light_embedding_param = torch.nn.Parameter(assert_not_none(light_embedding).requires_grad_(True))
+            light_embedding_param = torch.nn.Parameter(assert_not_none(embedding).requires_grad_(True))
             optimizer = torch.optim.Adam([light_embedding_param], lr=self.config.light_embedding_optim_lr)
 
             gt_image = torch.tensor(convert_image_dtype(dataset["images"][i], np.float32), dtype=torch.float32,
@@ -1710,8 +1692,7 @@ class NexusSplats(Method):
                 app_optim_type = self.config.appearance_optim_type
                 for _ in range(self.config.light_embedding_optim_iters):
                     optimizer.zero_grad()
-                    render_pkg = self.model.render_internal(camera,
-                                                            config=self.config,
+                    render_pkg = self.model.render_internal(camera, config=self.config,
                                                             light_embedding=light_embedding_param,
                                                             transient_embedding=None)
                     image = render_pkg["render"]
@@ -1770,11 +1751,7 @@ class NexusSplats(Method):
             )
             del _np_embedding
             embedding = embedding.to(device) if embedding is not None else None
-
-            out = self.model.render_internal(camera,
-                                             config=self.config,
-                                             light_embedding=embedding,
-                                             render_depth=render_depth)
+            out = self.model.render_internal(camera, config=self.config, light_embedding=embedding, render_depth=render_depth)
             image = out["render"]
             image = torch.clamp(image, 0.0, 1.0).nan_to_num_(0.0)
             color = image.detach().permute(1, 2, 0).cpu().numpy()
