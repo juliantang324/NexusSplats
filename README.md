@@ -34,12 +34,12 @@
 - [ ] Merge with the latest version of NerfBaselines
 
 ## Abstract
-we propose a nexus kernel-driven approach, called NexusSplats, for efficient and finer 3D scene reconstruction under complex lighting and occlusion conditions.
-Experimental results demonstrate that NexusSplats achieves state-of-the-art rendering quality and reduces reconstruction time in different scenes by up to 70.4% compared to the current best method in quality.
+We propose a nexus kernel-driven approach, called <em>NexusSplats</em>, for efficient and finer 3D scene reconstruction under complex lighting and occlusion conditions.
+Experimental results demonstrate that <em>NexusSplats</em> achieves state-of-the-art rendering quality and reduces reconstruction time in different scenes by up to 70.4% compared to the current best method in quality.
 <br>
 
 <img width="100%" alt="overview of NexusSplats" src="assets/overview.png" />
-<em>Left:</em> From the reference image, we extract light embedding and transient embedding to capture
+<strong>Overview of NexusSplats. </strong><em>Left:</em> From the reference image, we extract light embedding and transient embedding to capture
 global lighting and occlusion conditions. <em>Middle:</em> Our nexus kernels enable hierarchical management
 of Gaussian primitives, allowing efficient local adaptations to different lighting and occlusion conditions
 via the light decoupling module and the uncertainty splatting module. <em>Right:</em> Through tile
