@@ -85,6 +85,14 @@ ns render --checkpoint {checkpoint} --data external://phototourism/brandenburg-g
 ns evaluate {path/to/predictions} --output results.json
 ```
 
+## Interactive Viewer
+To start the viewer and explore the trained models, run one of the following commands:
+```bash
+ns viewer --checkpoint {checkpoint} --data external://phototourism/trevi-fountain
+ns viewer --checkpoint {checkpoint} --data external://phototourism/sacre-coeur
+ns viewer --checkpoint {checkpoint} --data external://phototourism/brandenburg-gate
+```
+
 ## Concurrent works
 There are several concurrent works that also aim to extend 3DGS to handle in-the-wild scenarios:
 <ul>
