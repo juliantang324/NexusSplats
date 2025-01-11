@@ -163,7 +163,7 @@ cython_debug/
 *.swp
 
 # checkpoint
-checkpoint*/
+*results/
 
 # shell
 *.sh
