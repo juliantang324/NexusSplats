@@ -28,9 +28,11 @@
 
 **[2024.11.25]** 🎈 We have released the codebase for NexusSplats.
 
+**[2025.1.16]**  🤗 We have released the pretrained models for NexusSplats in [#release](https://github.com/juliantang324/NexusSplats/releases/download/v1.0.0/phototourism.zip).
+
 ## TODO List
 - [x] Codebase release
-- [ ] Pretrained models
+- [x] Pretrained models
 - [ ] Merge with the latest version of NerfBaselines
 
 ## Abstract
