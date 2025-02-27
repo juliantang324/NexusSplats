@@ -165,5 +165,10 @@ cython_debug/
 # checkpoint
 *results/
 
+# data
+data/
+output/
+test/
+
 # shell
 *.sh
