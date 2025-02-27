@@ -172,3 +172,4 @@ test/
 
 # shell
 *.sh
+convert.py
