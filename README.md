@@ -25,10 +25,11 @@
 <br>
 
 ## News
-
-**[2024.11.25]** 🎈 We have released the codebase for NexusSplats.
+**[2025.2.20]** 😊 We have supported custom datasets with COLMAP format in NexusSplats.
 
 **[2025.1.16]**  🤗 We have released the pretrained models for NexusSplats in [#release](https://github.com/juliantang324/NexusSplats/releases/download/v1.0.0/phototourism.zip).
+
+**[2024.11.25]** 🎈 We have released the codebase for NexusSplats.
 
 ## TODO List
 - [x] Codebase release
@@ -36,17 +37,20 @@
 - [ ] Merge with the latest version of NerfBaselines
 
 ## Abstract
-We propose a nexus kernel-driven approach, called <em>NexusSplats</em>, for efficient and finer 3D scene reconstruction under complex lighting and occlusion conditions.
-Experimental results demonstrate that <em>NexusSplats</em> achieves state-of-the-art rendering quality and reduces reconstruction time in different scenes by up to 70.4% compared to the current best method in quality.
+Photorealistic 3D reconstruction of unstructured real-world scenes remains challenging due to complex illumination variations and transient occlusions. 
+Existing methods based on Neural Radiance Fields (NeRF) and 3D Gaussian Splatting (3DGS) struggle with inefficient light decoupling and structure-agnostic occlusion handling. 
+To address these limitations, we propose <strong>NexusSplats</strong>, an approach tailored for efficient and high-fidelity 3D scene reconstruction under complex lighting and occlusion conditions. 
+In particular, NexusSplats leverages a <strong>hierarchical light decoupling</strong> strategy that performs centralized appearance learning, efficiently and effectively decoupling varying lighting conditions. 
+Furthermore, a <strong>structure-aware occlusion handling</strong> mechanism is developed, establishing a nexus between 3D and 2D structures for fine-grained occlusion handling. 
+Experimental results demonstrate that NexusSplats achieves state-of-the-art rendering quality and reduces the number of total parameters by 65.4%, leading to 2.7× faster reconstruction.
 <br>
 
 <img width="100%" alt="overview of NexusSplats" src="assets/overview.png" />
-<strong>Overview of NexusSplats. </strong><em>Left:</em> From the reference image, we extract light embedding and transient embedding to capture
-global lighting and occlusion conditions. <em>Middle:</em> Our nexus kernels enable hierarchical management
-of Gaussian primitives, allowing efficient local adaptations to different lighting and occlusion conditions
-via the light decoupling module and the uncertainty splatting module. <em>Right:</em> Through tile
-rasterization, we project raw colors, mapped colors, and uncertainties onto 2D visible planes. A boundary
-penalty finally refines the filtering mask in handling occlusions.
+<strong>Overview of NexusSplats.</strong> Our framework operates in three stages:
+<em>First</em>, the <strong>Hierarchical Gaussian Management</strong> organizes 3D Gaussians into dynamic <em>nexus kernels</em>, which generate Gaussian attributes and perform <strong>Centralized Appearance Learning</strong> and <strong>Uncertainty Propagation</strong>.
+<em>Second</em>, a raw image, a mapped image, and an uncertainty mask are rendered though tile rasterization.
+<em>Third</em>, the <strong>Boundary-Aware Refinement</strong> corrects misclassified scene boundaries.
+The system optimizes via a combination of color loss and uncertainty loss.
 
 ## Installation
 Clone the repository and create a `python == 3.11` Anaconda environment with CUDA toolkit 11.8.

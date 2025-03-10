@@ -1,4 +1,4 @@
 appearance_enabled: false
+#uncertainty_enabled: false
 num_sky_gaussians: 100000
 use_boundary_penalty: false
-#n_offsets: 5
