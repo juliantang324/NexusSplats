@@ -4,6 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "NexusSplats"
+authors = [{name = "Yuzhou Tang", email = "juliantang@stu.xmu.edu.cn"}]
 version = "0.0.1"
 description = "Official code release for the NexusSplats paper"
 readme = "README.md"
