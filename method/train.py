@@ -359,7 +359,7 @@ def train_command(
                 logging.warning(f"removed existing checkpoint at {path}")
             method.save(str(path))
             with open(path / "nb-info.json", "w") as f:
-                json.dump({"method": "method"}, f)
+                json.dump({"method": info['method_id']}, f)
             logging.info(f"checkpoint saved at step={step}")
 
         if step in eval_few_iters:
@@ -402,7 +402,7 @@ def train_command(
             logging.warning(f"removed existing checkpoint at {path}")
         method.save(str(path))
         with open(path / "nb-info.json", "w") as f:
-            json.dump({"method": "method"}, f)
+            json.dump({"method": info['method_id']}, f)
         logging.info(f"checkpoint saved at step={step}")
 
     logging.info(f"training finished, total elapsed time: {pbar.format_dict['elapsed']} seconds")
